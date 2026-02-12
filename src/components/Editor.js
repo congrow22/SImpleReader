@@ -35,6 +35,8 @@ const welcome = document.getElementById('editor-welcome');
 
 // Buffer lines above and below viewport
 const BUFFER_LINES = 50;
+// Maximum virtual scroll height to avoid browser CSS height limits (~33M px)
+const MAX_SCROLL_HEIGHT = 15_000_000;
 
 export function init(options = {}) {
     onModified = options.onModified || null;
@@ -98,7 +100,7 @@ export async function loadFile(fileInfo) {
     updateScrollHeight();
 
     if (currentLine > 0) {
-        scrollArea.scrollTop = currentLine * lineHeight;
+        scrollArea.scrollTop = currentLine * lineHeight * getScrollRatio();
     } else {
         scrollArea.scrollTop = 0;
     }
@@ -138,7 +140,8 @@ export function getCurrentLine() {
     if (!currentFileId || totalLines === 0) return currentLine;
     const scrollTop = scrollArea.scrollTop;
     const viewportHeight = scrollArea.clientHeight;
-    const centerLine = Math.floor((scrollTop + viewportHeight / 2) / lineHeight) + 1;
+    const ratio = getScrollRatio();
+    const centerLine = Math.floor((scrollTop + viewportHeight / 2) / (lineHeight * ratio)) + 1;
     return Math.max(1, Math.min(centerLine, totalLines));
 }
 
@@ -146,10 +149,17 @@ export function getTotalLines() {
     return totalLines;
 }
 
+function getScrollRatio() {
+    const naturalHeight = totalLines * lineHeight;
+    if (naturalHeight <= MAX_SCROLL_HEIGHT) return 1;
+    return MAX_SCROLL_HEIGHT / naturalHeight;
+}
+
 function updateScrollHeight() {
-    const totalHeight = totalLines * lineHeight;
+    const naturalHeight = totalLines * lineHeight;
+    const virtualHeight = Math.min(naturalHeight, MAX_SCROLL_HEIGHT);
     spacerTop.style.height = '0px';
-    spacerBottom.style.height = totalHeight + 'px';
+    spacerBottom.style.height = virtualHeight + 'px';
 }
 
 function onScroll() {
@@ -175,8 +185,9 @@ async function renderVisibleLines(force = false) {
     const thisGeneration = renderGeneration;
     const scrollTop = scrollArea.scrollTop;
     const viewportHeight = scrollArea.clientHeight;
+    const ratio = getScrollRatio();
 
-    const firstVisible = Math.floor(scrollTop / lineHeight);
+    const firstVisible = Math.floor(scrollTop / (lineHeight * ratio));
     const visibleCount = Math.ceil(viewportHeight / lineHeight);
 
     const startLine = Math.max(0, firstVisible - BUFFER_LINES);
@@ -199,8 +210,8 @@ async function renderVisibleLines(force = false) {
         // If a newer render was triggered while we were fetching, skip this stale update
         if (thisGeneration !== renderGeneration) return;
 
-        spacerTop.style.height = (startLine * lineHeight) + 'px';
-        spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight) + 'px';
+        spacerTop.style.height = (startLine * lineHeight * ratio) + 'px';
+        spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight * ratio) + 'px';
 
         renderLines(chunk.lines, startLine);
 
@@ -411,11 +422,12 @@ export function clearSearchHighlights() {
 
 export function scrollToLine(lineNumber) {
     if (lineNumber < 1 || lineNumber > totalLines) return;
-    const targetScroll = (lineNumber - 1) * lineHeight;
+    const ratio = getScrollRatio();
+    const targetScroll = (lineNumber - 1) * lineHeight * ratio;
     const viewportHeight = scrollArea.clientHeight;
     const newScrollTop = targetScroll - (viewportHeight / 2) + (lineHeight / 2);
     scrollArea.scrollTop = newScrollTop;
-    console.log('[scrollToLine] line=' + lineNumber + ' lineHeight=' + lineHeight + ' target=' + newScrollTop + ' actual=' + scrollArea.scrollTop + ' scrollHeight=' + scrollArea.scrollHeight);
+    console.log('[scrollToLine] line=' + lineNumber + ' lineHeight=' + lineHeight + ' ratio=' + ratio + ' target=' + newScrollTop + ' actual=' + scrollArea.scrollTop + ' scrollHeight=' + scrollArea.scrollHeight);
     currentLine = lineNumber;
     if (onLineChange) onLineChange(currentLine, totalLines);
 }

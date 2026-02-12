@@ -858,8 +858,9 @@ function updateSaveButton(isModified) {
 }
 
 function updateStatusLine(currentLine, totalLines) {
+    const percent = totalLines > 0 ? (currentLine / totalLines * 100).toFixed(1) : '0.0';
     document.getElementById('status-line').textContent =
-        '\uC904: ' + currentLine.toLocaleString() + ' / ' + totalLines.toLocaleString();
+        '\uC904: ' + currentLine.toLocaleString() + ' / ' + totalLines.toLocaleString() + ' (' + percent + ' %)';
 }
 
 // ============================================================

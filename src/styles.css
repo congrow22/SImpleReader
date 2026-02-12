@@ -975,14 +975,6 @@ html, body {
     white-space: pre;
 }
 
-.editor-line:hover {
-    background: var(--line-highlight);
-}
-
-.editor-line.current-line {
-    background: var(--line-highlight);
-}
-
 .editor-line.search-match {
     background: var(--search-highlight);
 }
