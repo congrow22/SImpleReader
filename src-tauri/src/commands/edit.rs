@@ -20,6 +20,26 @@ pub async fn insert_text(
 }
 
 #[command]
+pub async fn replace_line(
+    file_id: String,
+    line_index: usize,
+    new_text: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
+    {
+        let buffer = tab_manager
+            .get_buffer_mut(&file_id)
+            .map_err(|e| e.to_string())?;
+        if !buffer.replace_line(line_index, &new_text) {
+            return Err(format!("Line index out of range: {}", line_index));
+        }
+    }
+    tab_manager.set_modified(&file_id, true);
+    Ok(())
+}
+
+#[command]
 pub async fn delete_text(
     file_id: String,
     start: usize,

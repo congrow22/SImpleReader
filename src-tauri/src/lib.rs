@@ -53,6 +53,7 @@ pub fn run() {
             commands::get_total_lines,
             // Edit commands
             commands::insert_text,
+            commands::replace_line,
             commands::delete_text,
             commands::undo,
             commands::redo,
@@ -63,6 +64,9 @@ pub fn run() {
             commands::get_all_bookmarks,
             commands::search_bookmarks,
             commands::save_last_position,
+            commands::track_file_open,
+            commands::get_file_list,
+            commands::remove_file_entry,
             // Search commands
             commands::search_text,
             commands::replace_text,

@@ -34,6 +34,15 @@ pub struct BookmarkSearchResult {
     pub bookmark: Bookmark,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct FileListEntry {
+    pub file_path: String,
+    pub file_name: String,
+    pub last_position: usize,
+    pub last_opened: String,
+    pub bookmark_count: usize,
+}
+
 pub struct BookmarkStore {
     data: HashMap<String, FileBookmarks>,
     store_path: PathBuf,
@@ -145,20 +154,60 @@ impl BookmarkStore {
         results
     }
 
-    /// Save the last reading position for a file.
+    /// Save the last reading position for a file (only if already tracked).
     pub fn save_last_position(&mut self, file_path: &str, position: usize) -> anyhow::Result<()> {
-        let entry = self
-            .data
-            .entry(file_path.to_string())
-            .or_default();
-        entry.last_position = position;
-        entry.last_opened = chrono::Local::now().to_rfc3339();
-        self.save_to_disk()?;
+        if let Some(entry) = self.data.get_mut(file_path) {
+            entry.last_position = position;
+            entry.last_opened = chrono::Local::now().to_rfc3339();
+            self.save_to_disk()?;
+        }
         Ok(())
     }
 
     /// Get the last reading position for a file.
     pub fn get_last_position(&self, file_path: &str) -> Option<usize> {
         self.data.get(file_path).map(|entry| entry.last_position)
+    }
+
+    /// Track a file being opened (creates entry if not exists, updates last_opened).
+    pub fn track_file_open(&mut self, file_path: &str) -> anyhow::Result<()> {
+        let entry = self
+            .data
+            .entry(file_path.to_string())
+            .or_default();
+        entry.last_opened = chrono::Local::now().to_rfc3339();
+        self.save_to_disk()?;
+        Ok(())
+    }
+
+    /// Get a list of all tracked files with metadata.
+    pub fn get_file_list(&self) -> Vec<FileListEntry> {
+        let mut entries: Vec<FileListEntry> = self
+            .data
+            .iter()
+            .map(|(file_path, file_bookmarks)| {
+                let file_name = std::path::Path::new(file_path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                FileListEntry {
+                    file_path: file_path.clone(),
+                    file_name,
+                    last_position: file_bookmarks.last_position,
+                    last_opened: file_bookmarks.last_opened.clone(),
+                    bookmark_count: file_bookmarks.bookmarks.len(),
+                }
+            })
+            .collect();
+        // Sort by last_opened descending (most recent first)
+        entries.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+        entries
+    }
+
+    /// Remove a file entry and all its bookmarks.
+    pub fn remove_file_entry(&mut self, file_path: &str) -> anyhow::Result<()> {
+        self.data.remove(file_path);
+        self.save_to_disk()?;
+        Ok(())
     }
 }

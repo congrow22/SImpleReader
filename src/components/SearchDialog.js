@@ -136,6 +136,10 @@ async function performSearch() {
             caseSensitive: caseSensitive
         });
 
+        console.log('[Search] Results for "' + query + '":', matches.map((m, i) =>
+            'match ' + i + ': line=' + m.line + ' charStart=' + m.line_char_start + ' charEnd=' + m.line_char_end
+        ));
+
         if (matches.length > 0) {
             currentMatchIndex = 0;
             searchCount.textContent = '1 / ' + matches.length;

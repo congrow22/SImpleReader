@@ -55,6 +55,18 @@ async function initApp() {
     initDragAndDrop();
     initWelcome();
 
+    // Save button
+    const btnSave = document.getElementById('btn-save');
+    if (btnSave) {
+        btnSave.addEventListener('click', handleSave);
+    }
+
+    // Edit mode toggle button
+    const btnEditMode = document.getElementById('btn-edit-mode');
+    if (btnEditMode) {
+        btnEditMode.addEventListener('click', handleToggleEditMode);
+    }
+
     // Load any open tabs from backend
     try {
         const tabs = await invoke('get_open_tabs');
@@ -104,11 +116,16 @@ function initTabBar() {
 function initEditor() {
     Editor.init({
         onModified: (fileId) => {
+            const info = state.files.get(fileId);
+            if (info) info.is_modified = true;
             TabBar.updateTab(fileId, { is_modified: true });
             updateStatusBar();
         },
         onLineChange: (currentLine, totalLines) => {
             updateStatusLine(currentLine, totalLines);
+        },
+        onEditModeChange: (editMode) => {
+            updateEditModeUI(editMode);
         }
     });
 }
@@ -118,6 +135,18 @@ function initBookmarkPanel() {
         onBookmarkClick: (position, line) => {
             if (line > 0) {
                 Editor.scrollToLine(line);
+            }
+        },
+        onFileClick: async (filePath) => {
+            await openFile(filePath);
+        },
+        onFileRemove: (filePath) => {
+            // Close the tab if this file is currently open
+            for (const [fileId, info] of state.files) {
+                if (info.path === filePath) {
+                    handleTabClose(fileId);
+                    break;
+                }
             }
         }
     });
@@ -310,6 +339,13 @@ function initKeyboardShortcuts() {
             return;
         }
 
+        // F2: Toggle edit mode
+        if (e.key === 'F2') {
+            e.preventDefault();
+            handleToggleEditMode();
+            return;
+        }
+
         // Escape: Close dialogs
         if (e.key === 'Escape') {
             if (SearchDialog.isOpen()) {
@@ -432,6 +468,9 @@ function handleMenuAction(action) {
         case 'goto-line':
             GoToLineDialog.show(Editor.getCurrentLine(), Editor.getTotalLines());
             break;
+        case 'toggle-edit-mode':
+            handleToggleEditMode();
+            break;
         case 'toggle-bookmark-panel':
             BookmarkPanel.togglePanel();
             break;
@@ -479,6 +518,14 @@ async function openFile(path) {
         SearchDialog.setFileId(fileInfo.id);
         BookmarkPanel.loadBookmarks(fileInfo.path);
 
+        // Track file open for file list
+        try {
+            await invoke('track_file_open', { filePath: fileInfo.path });
+            BookmarkPanel.refreshFileList();
+        } catch (e) {
+            // non-critical
+        }
+
         updateStatusBar();
     } catch (err) {
         console.error('Failed to open file:', err);
@@ -491,6 +538,8 @@ async function handleSave() {
 
     try {
         await invoke('save_file', { fileId: fileId });
+        const info = state.files.get(fileId);
+        if (info) info.is_modified = false;
         TabBar.updateTab(fileId, { is_modified: false });
         updateStatusBar();
     } catch (err) {
@@ -638,6 +687,27 @@ function handleAddBookmark() {
 }
 
 // ============================================================
+// Edit Mode
+// ============================================================
+
+function handleToggleEditMode() {
+    const editMode = Editor.toggleEditMode();
+    updateEditModeUI(editMode);
+}
+
+function updateEditModeUI(editMode) {
+    const btn = document.getElementById('btn-edit-mode');
+    if (btn) {
+        btn.classList.toggle('active', editMode);
+        btn.title = editMode ? '뷰어 모드로 전환 (F2)' : '편집 모드로 전환 (F2)';
+    }
+    const statusMode = document.getElementById('status-mode');
+    if (statusMode) {
+        statusMode.textContent = editMode ? '편집' : '뷰어';
+    }
+}
+
+// ============================================================
 // Status Bar
 // ============================================================
 
@@ -649,6 +719,7 @@ function updateStatusBar() {
         document.getElementById('status-chars').textContent = '\uBB38\uC790: 0';
         document.getElementById('status-encoding').textContent = 'UTF-8';
         document.getElementById('status-modified').textContent = '';
+        updateSaveButton(false);
         return;
     }
 
@@ -658,6 +729,21 @@ function updateStatusBar() {
         document.getElementById('status-chars').textContent = '\uBB38\uC790: ' + (info.total_chars || 0).toLocaleString();
         document.getElementById('status-encoding').textContent = 'UTF-8';
         document.getElementById('status-modified').textContent = info.is_modified ? '\uC218\uC815\uB428' : '';
+        updateSaveButton(info.is_modified);
+    }
+}
+
+function updateSaveButton(isModified) {
+    const btn = document.getElementById('btn-save');
+    if (!btn) return;
+    if (isModified) {
+        btn.disabled = false;
+        btn.classList.add('has-changes');
+        btn.title = '\uC800\uC7A5 (Ctrl+S) - \uC218\uC815\uC0AC\uD56D \uC788\uC74C';
+    } else {
+        btn.disabled = true;
+        btn.classList.remove('has-changes');
+        btn.title = '\uC800\uC7A5 (Ctrl+S)';
     }
 }
 

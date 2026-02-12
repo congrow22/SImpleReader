@@ -65,19 +65,29 @@
                 </div>
             </div>
             <div class="menu-right">
+                <button class="menu-icon-btn" id="btn-save" title="저장 (Ctrl+S)" disabled>
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3.828a1 1 0 0 0-.293-.707l-1.828-1.828A1 1 0 0 0 12.172 1H2zm0 1h10.172L14 3.828V14H2V2zm2 9a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4v-2zm7 0H5v2h6v-2zM5 3h4v3H5V3zm1 0v2h2V3H6z"/>
+                    </svg>
+                </button>
+                <button class="menu-icon-btn" id="btn-edit-mode" title="편집 모드 전환 (F2)">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                    </svg>
+                </button>
                 <button class="menu-icon-btn" id="btn-bookmark" title="책갈피 추가 (Ctrl+B)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M3 1.5A1.5 1.5 0 0 1 4.5 0h7A1.5 1.5 0 0 1 13 1.5v13a.5.5 0 0 1-.74.439L8 12.297l-4.26 2.642A.5.5 0 0 1 3 14.5v-13zM4.5 1a.5.5 0 0 0-.5.5v11.78l3.76-2.331a.5.5 0 0 1 .48 0L12 13.28V1.5a.5.5 0 0 0-.5-.5h-7z"/>
                     </svg>
                 </button>
                 <button class="menu-icon-btn" id="btn-settings" title="설정">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
                         <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.892 3.434-.901 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291a1.873 1.873 0 0 0-1.116-2.693l-.318-.094c-.835-.246-.835-1.428 0-1.674l.319-.094a1.873 1.873 0 0 0 1.115-2.693l-.16-.291c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.116l.094-.318z"/>
                     </svg>
                 </button>
                 <button class="menu-icon-btn" id="btn-help" title="도움말">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
                         <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286zm1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94z"/>
                     </svg>
@@ -93,16 +103,28 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Bookmark Sidebar -->
+            <!-- Sidebar Panel -->
             <div id="bookmark-panel" class="bookmark-panel">
-                <div class="bookmark-header">
-                    <span class="bookmark-title">책갈피</span>
-                    <button class="bookmark-toggle-btn" id="btn-toggle-bookmark-mode" title="모드 전환">전체</button>
+                <div class="panel-tabs">
+                    <button class="panel-tab active" id="panel-tab-files" title="열어본 파일 목록">파일</button>
+                    <button class="panel-tab" id="panel-tab-bookmarks" title="책갈피">책갈피</button>
                 </div>
-                <div class="bookmark-search">
-                    <input type="text" id="bookmark-search-input" placeholder="책갈피 검색..." />
+
+                <!-- File List View -->
+                <div class="panel-view" id="file-list-view">
+                    <div class="file-list" id="file-list"></div>
                 </div>
-                <div class="bookmark-list" id="bookmark-list"></div>
+
+                <!-- Bookmark View -->
+                <div class="panel-view hidden" id="bookmark-view">
+                    <div class="bookmark-header">
+                        <button class="bookmark-toggle-btn" id="btn-toggle-bookmark-mode" title="모드 전환">전체</button>
+                    </div>
+                    <div class="bookmark-search">
+                        <input type="text" id="bookmark-search-input" placeholder="책갈피 검색..." />
+                    </div>
+                    <div class="bookmark-list" id="bookmark-list"></div>
+                </div>
             </div>
 
             <!-- Resize Handle -->
@@ -161,6 +183,8 @@
                 <span class="status-item" id="status-chars">문자: 0</span>
             </div>
             <div class="status-right">
+                <span class="status-item" id="status-mode">뷰어</span>
+                <span class="status-separator">|</span>
                 <span class="status-item" id="status-encoding">UTF-8</span>
                 <span class="status-separator">|</span>
                 <span class="status-item" id="status-modified"></span>
@@ -265,6 +289,24 @@
             <div class="modal-footer">
                 <button class="modal-btn modal-btn-secondary" id="btn-bookmark-add-cancel">취소</button>
                 <button class="modal-btn modal-btn-primary" id="btn-bookmark-add-confirm">추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Delete Confirm Dialog -->
+    <div id="file-delete-dialog" class="modal-overlay hidden">
+        <div class="modal-dialog bookmark-add-modal">
+            <div class="modal-header">
+                <h3>파일 삭제</h3>
+                <button class="modal-close-btn" id="btn-file-delete-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="file-delete-name" id="file-delete-name"></p>
+                <p class="file-delete-warning">이 파일의 모든 책갈피와 읽기 기록이 함께 삭제됩니다.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="btn-file-delete-cancel">취소</button>
+                <button class="modal-btn modal-btn-danger" id="btn-file-delete-confirm">삭제</button>
             </div>
         </div>
     </div>

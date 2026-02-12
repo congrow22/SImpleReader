@@ -1,7 +1,37 @@
-use crate::bookmark::{Bookmark, BookmarkSearchResult, FileBookmarks};
+use crate::bookmark::{Bookmark, BookmarkSearchResult, FileBookmarks, FileListEntry};
 use crate::AppState;
 use std::collections::HashMap;
 use tauri::command;
+
+#[command]
+pub async fn track_file_open(
+    file_path: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .track_file_open(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn get_file_list(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<FileListEntry>, String> {
+    let store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    Ok(store.get_file_list())
+}
+
+#[command]
+pub async fn remove_file_entry(
+    file_path: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .remove_file_entry(&file_path)
+        .map_err(|e| e.to_string())
+}
 
 #[command]
 pub async fn add_bookmark(

@@ -6,50 +6,75 @@ pub struct SearchMatch {
     pub line: usize,
     pub char_start: usize,
     pub char_end: usize,
+    pub line_char_start: usize,
+    pub line_char_end: usize,
     pub context: String,
 }
 
+/// Count UTF-16 code units for a string (matches JavaScript's string indexing).
+fn utf16_len(s: &str) -> usize {
+    s.chars().map(|c| c.len_utf16()).sum()
+}
+
 /// Search for all occurrences of a query in a Rope.
+/// Searches line-by-line to avoid byte/char position mismatches.
+/// line_char_start/line_char_end use UTF-16 code unit offsets (for JS compatibility).
 pub fn search_in_rope(rope: &Rope, query: &str, case_sensitive: bool) -> Vec<SearchMatch> {
     if query.is_empty() {
         return Vec::new();
     }
 
     let mut results = Vec::new();
-    let text = rope.to_string();
-    let search_text;
-    let search_query;
-
-    if case_sensitive {
-        search_text = text.clone();
-        search_query = query.to_string();
+    let search_query = if case_sensitive {
+        query.to_string()
     } else {
-        search_text = text.to_lowercase();
-        search_query = query.to_lowercase();
+        query.to_lowercase()
     };
+    let query_chars = query.chars().count();
+    let query_utf16_len = utf16_len(query);
 
-    let mut start = 0;
-    while let Some(pos) = search_text[start..].find(&search_query) {
-        let abs_pos = start + pos;
-        // Convert byte position to char position
-        let char_start = text[..abs_pos].chars().count();
-        let char_end = char_start + query.chars().count();
+    let mut global_char_offset: usize = 0;
 
-        // Find the line number
-        let line = rope.char_to_line(char_start);
+    for line_idx in 0..rope.len_lines() {
+        let line = rope.line(line_idx);
+        let line_text = line.to_string();
+        let search_line = if case_sensitive {
+            line_text.clone()
+        } else {
+            line_text.to_lowercase()
+        };
 
-        // Get context (the full line)
-        let line_text = rope.line(line).to_string();
-        let context = line_text.trim_end_matches('\n').to_string();
+        let mut byte_start = 0;
+        while let Some(byte_pos) = search_line[byte_start..].find(&search_query) {
+            let abs_byte_pos = byte_start + byte_pos;
+            // Count Unicode chars for Rope operations (char_start/char_end)
+            let line_char_start_unicode = line_text[..abs_byte_pos].chars().count();
 
-        results.push(SearchMatch {
-            line,
-            char_start,
-            char_end,
-            context,
-        });
+            // Count UTF-16 code units for JS substring (line_char_start/line_char_end)
+            let line_char_start = utf16_len(&line_text[..abs_byte_pos]);
+            let line_char_end = line_char_start + query_utf16_len;
 
-        start = abs_pos + search_query.len();
+            let char_start = global_char_offset + line_char_start_unicode;
+            let char_end = char_start + query_chars;
+
+            let context = line_text
+                .trim_end_matches('\n')
+                .trim_end_matches('\r')
+                .to_string();
+
+            results.push(SearchMatch {
+                line: line_idx,
+                char_start,
+                char_end,
+                line_char_start,
+                line_char_end,
+                context,
+            });
+
+            byte_start = abs_byte_pos + search_query.len();
+        }
+
+        global_char_offset += line_text.chars().count();
     }
 
     results

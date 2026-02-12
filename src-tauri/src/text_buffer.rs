@@ -5,6 +5,7 @@ use std::path::Path;
 pub enum EditOperation {
     Insert { position: usize, text: String },
     Delete { position: usize, text: String },
+    Replace { position: usize, old_text: String, new_text: String },
 }
 
 pub struct TextBuffer {
@@ -63,6 +64,51 @@ impl TextBuffer {
         self.is_modified = true;
     }
 
+    /// Replace the content of a specific line (preserving line ending).
+    pub fn replace_line(&mut self, line_idx: usize, new_text: &str) -> bool {
+        let total_lines = self.rope.len_lines();
+        if line_idx >= total_lines {
+            return false;
+        }
+
+        let start_char = self.rope.line_to_char(line_idx);
+        let line = self.rope.line(line_idx);
+        let line_str = line.to_string();
+        let line_len = line.len_chars();
+
+        // Determine content length (excluding trailing newline)
+        let content_len = if line_str.ends_with("\r\n") {
+            line_len.saturating_sub(2)
+        } else if line_str.ends_with('\n') || line_str.ends_with('\r') {
+            line_len.saturating_sub(1)
+        } else {
+            line_len // last line without newline
+        };
+
+        let end_char = start_char + content_len;
+        let old_text = self.rope.slice(start_char..end_char).to_string();
+
+        // Strip trailing newlines from new_text
+        let new_text_clean = new_text.trim_end_matches(|c: char| c == '\n' || c == '\r');
+
+        // Remove old content, insert new
+        if start_char < end_char {
+            self.rope.remove(start_char..end_char);
+        }
+        if !new_text_clean.is_empty() {
+            self.rope.insert(start_char, new_text_clean);
+        }
+
+        self.undo_stack.push(EditOperation::Replace {
+            position: start_char,
+            old_text,
+            new_text: new_text_clean.to_string(),
+        });
+        self.redo_stack.clear();
+        self.is_modified = true;
+        true
+    }
+
     /// Delete text from start_char (inclusive) to end_char (exclusive).
     pub fn delete_text(&mut self, start_char: usize, end_char: usize) {
         let total = self.rope.len_chars();
@@ -92,6 +138,11 @@ impl TextBuffer {
                 EditOperation::Delete { position, text } => {
                     self.rope.insert(*position, text);
                 }
+                EditOperation::Replace { position, old_text, new_text } => {
+                    let end = *position + new_text.chars().count();
+                    self.rope.remove(*position..end);
+                    self.rope.insert(*position, old_text);
+                }
             }
             self.redo_stack.push(op);
             self.is_modified = !self.undo_stack.is_empty();
@@ -111,6 +162,11 @@ impl TextBuffer {
                 EditOperation::Delete { position, text } => {
                     let end = *position + text.chars().count();
                     self.rope.remove(*position..end);
+                }
+                EditOperation::Replace { position, old_text, new_text } => {
+                    let end = *position + old_text.chars().count();
+                    self.rope.remove(*position..end);
+                    self.rope.insert(*position, new_text);
                 }
             }
             self.undo_stack.push(op);

@@ -19,8 +19,11 @@ let searchMatches = [];
 let activeMatchIndex = -1;
 let cachedChunks = new Map();
 let scrollRAF = null;
+let renderGeneration = 0;
 let onModified = null;
 let onLineChange = null;
+let onEditModeChange = null;
+let editMode = false;
 
 // DOM elements
 const container = document.getElementById('editor-container');
@@ -36,6 +39,7 @@ const BUFFER_LINES = 50;
 export function init(options = {}) {
     onModified = options.onModified || null;
     onLineChange = options.onLineChange || null;
+    onEditModeChange = options.onEditModeChange || null;
 
     scrollArea.addEventListener('scroll', onScroll, { passive: true });
 
@@ -99,6 +103,7 @@ export async function loadFile(fileInfo) {
         scrollArea.scrollTop = 0;
     }
 
+    renderGeneration++;
     await renderVisibleLines(true);
 }
 
@@ -157,6 +162,7 @@ function onScroll() {
 
 function scheduleRender() {
     if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    renderGeneration++; // Invalidate any in-flight async renders immediately
     scrollRAF = requestAnimationFrame(async () => {
         scrollRAF = null;
         await renderVisibleLines(true);
@@ -166,6 +172,7 @@ function scheduleRender() {
 async function renderVisibleLines(force = false) {
     if (!currentFileId || totalLines === 0) return;
 
+    const thisGeneration = renderGeneration;
     const scrollTop = scrollArea.scrollTop;
     const viewportHeight = scrollArea.clientHeight;
 
@@ -188,6 +195,9 @@ async function renderVisibleLines(force = false) {
     try {
         const chunk = await getChunk(startLine, endLine);
         if (!chunk) return;
+
+        // If a newer render was triggered while we were fetching, skip this stale update
+        if (thisGeneration !== renderGeneration) return;
 
         spacerTop.style.height = (startLine * lineHeight) + 'px';
         spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight) + 'px';
@@ -273,10 +283,15 @@ function renderLines(lines, startLine) {
             contentEl.textContent = lines[i];
         }
 
-        // Make line editable on double click
+        // Make line editable on double click (always) or single click (edit mode)
         const lineText = lines[i];
         contentEl.addEventListener('dblclick', () => {
             startLineEdit(contentEl, lineIdx, lineText);
+        });
+        contentEl.addEventListener('click', () => {
+            if (editMode) {
+                startLineEdit(contentEl, lineIdx, lineText);
+            }
         });
 
         lineEl.appendChild(numEl);
@@ -291,15 +306,15 @@ function renderLines(lines, startLine) {
 }
 
 function buildHighlightedContent(container, text, lineMatches) {
-    // Sort matches by char_start
-    lineMatches.sort((a, b) => a.match.char_start - b.match.char_start);
+    // Sort matches by line-relative position
+    lineMatches.sort((a, b) => a.match.line_char_start - b.match.line_char_start);
 
     let lastEnd = 0;
 
     for (const { match, globalIdx } of lineMatches) {
         // Text before this match
-        if (match.char_start > lastEnd) {
-            container.appendChild(document.createTextNode(text.substring(lastEnd, match.char_start)));
+        if (match.line_char_start > lastEnd) {
+            container.appendChild(document.createTextNode(text.substring(lastEnd, match.line_char_start)));
         }
 
         // The match itself as a <mark> element
@@ -307,10 +322,10 @@ function buildHighlightedContent(container, text, lineMatches) {
         if (globalIdx === activeMatchIndex) {
             mark.className = 'active';
         }
-        mark.textContent = text.substring(match.char_start, match.char_end);
+        mark.textContent = text.substring(match.line_char_start, match.line_char_end);
         container.appendChild(mark);
 
-        lastEnd = match.char_end;
+        lastEnd = match.line_char_end;
     }
 
     // Remaining text after last match
@@ -338,10 +353,10 @@ function startLineEdit(contentEl, lineIndex, originalText) {
         const newText = contentEl.textContent;
         if (newText !== originalText) {
             try {
-                await invoke('insert_text', {
+                await invoke('replace_line', {
                     fileId: currentFileId,
-                    position: lineIndex,
-                    text: newText
+                    lineIndex: lineIndex,
+                    newText: newText
                 });
 
                 cachedChunks.clear();
@@ -379,7 +394,9 @@ export function setSearchMatches(matches, activeIndex = -1) {
 export function setActiveMatch(index) {
     activeMatchIndex = index;
     if (index >= 0 && index < searchMatches.length) {
-        scrollToLine(searchMatches[index].line + 1);
+        const match = searchMatches[index];
+        console.log('[Search Nav] index=' + index + ' line=' + match.line + ' -> scrollToLine(' + (match.line + 1) + ') totalLines=' + totalLines);
+        scrollToLine(match.line + 1);
     }
     cachedChunks.clear();
     scheduleRender();
@@ -396,7 +413,9 @@ export function scrollToLine(lineNumber) {
     if (lineNumber < 1 || lineNumber > totalLines) return;
     const targetScroll = (lineNumber - 1) * lineHeight;
     const viewportHeight = scrollArea.clientHeight;
-    scrollArea.scrollTop = targetScroll - (viewportHeight / 2) + (lineHeight / 2);
+    const newScrollTop = targetScroll - (viewportHeight / 2) + (lineHeight / 2);
+    scrollArea.scrollTop = newScrollTop;
+    console.log('[scrollToLine] line=' + lineNumber + ' lineHeight=' + lineHeight + ' target=' + newScrollTop + ' actual=' + scrollArea.scrollTop + ' scrollHeight=' + scrollArea.scrollHeight);
     currentLine = lineNumber;
     if (onLineChange) onLineChange(currentLine, totalLines);
 }
@@ -409,10 +428,22 @@ export async function refreshContent() {
         totalLines = lines;
         updateScrollHeight();
         cachedChunks.clear();
+        renderGeneration++;
         await renderVisibleLines(true);
     } catch (err) {
         console.error('Failed to refresh:', err);
     }
+}
+
+export function toggleEditMode() {
+    editMode = !editMode;
+    container.classList.toggle('edit-mode', editMode);
+    if (onEditModeChange) onEditModeChange(editMode);
+    return editMode;
+}
+
+export function isEditMode() {
+    return editMode;
 }
 
 export function updateFontSize(size) {
