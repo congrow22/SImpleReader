@@ -11,16 +11,10 @@ let onTabClose = null;
 let onNewTab = null;
 
 const tabList = document.getElementById('tab-list');
-const btnNewTab = document.getElementById('btn-new-tab');
-
 export function init({ onSwitch, onClose, onNew }) {
     onTabSwitch = onSwitch;
     onTabClose = onClose;
     onNewTab = onNew;
-
-    btnNewTab.addEventListener('click', () => {
-        if (onNewTab) onNewTab();
-    });
 }
 
 export function addTab(fileInfo) {

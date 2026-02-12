@@ -1,5 +1,5 @@
 /**
- * SImpleReader - Main Application Entry Point
+ * SimpleReader - Main Application Entry Point
  * Initializes all components, sets up keyboard shortcuts, and manages app state.
  */
 
@@ -102,6 +102,14 @@ async function initApp() {
     } catch (err) {
         // No open tabs, that is fine
     }
+
+    // Listen for file open from CLI args (file association)
+    listen('open-file-from-args', async (event) => {
+        const filePath = event.payload;
+        if (filePath) {
+            await openFile(filePath);
+        }
+    });
 }
 
 function applyConfig(config) {
@@ -121,6 +129,7 @@ function applyConfig(config) {
     const editorContainer = document.getElementById('editor-container');
     if (editorContainer) {
         editorContainer.classList.toggle('hide-line-numbers', config.show_line_numbers === false);
+        editorContainer.classList.toggle('word-wrap', config.word_wrap === true);
     }
     updateLineNumbersMenuLabel(config.show_line_numbers !== false);
 }
@@ -187,6 +196,13 @@ function initSearchDialog() {
         },
         onActiveMatchChange: (index) => {
             Editor.setActiveMatch(index);
+        },
+        onReplace: (fileId) => {
+            const info = state.files.get(fileId);
+            if (info) info.is_modified = true;
+            TabBar.updateTab(fileId, { is_modified: true });
+            Editor.refreshContent();
+            updateStatusBar();
         }
     });
 }
@@ -867,5 +883,5 @@ function showHelp() {
     ].join('\n');
 
     // Using a simple approach since we don't have a dedicated help modal
-    console.log('SImpleReader Shortcuts:\n' + shortcuts);
+    console.log('SimpleReader Shortcuts:\n' + shortcuts);
 }

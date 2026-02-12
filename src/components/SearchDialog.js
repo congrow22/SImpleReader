@@ -11,6 +11,7 @@ let currentMatchIndex = -1;
 let currentFileId = null;
 let onMatchesUpdate = null;
 let onActiveMatchChange = null;
+let onReplace = null;
 let searchTimeout = null;
 
 // DOM
@@ -29,6 +30,7 @@ const btnReplaceAll = document.getElementById('btn-replace-all');
 export function init(options = {}) {
     onMatchesUpdate = options.onMatchesUpdate || null;
     onActiveMatchChange = options.onActiveMatchChange || null;
+    onReplace = options.onReplace || null;
 
     searchInput.addEventListener('input', () => {
         clearTimeout(searchTimeout);
@@ -191,6 +193,7 @@ async function replaceOne() {
             caseSensitive: caseSensitive
         });
 
+        if (onReplace) onReplace(currentFileId);
         await performSearch();
     } catch (err) {
         console.error('Replace failed:', err);
@@ -216,6 +219,7 @@ async function replaceAll() {
         matches = [];
         currentMatchIndex = -1;
 
+        if (onReplace) onReplace(currentFileId);
         if (onMatchesUpdate) onMatchesUpdate([], -1);
     } catch (err) {
         console.error('Replace all failed:', err);

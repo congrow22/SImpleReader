@@ -14,6 +14,8 @@ pub struct AppConfig {
     pub font_bold: bool,
     #[serde(default = "default_true")]
     pub show_line_numbers: bool,
+    #[serde(default)]
+    pub word_wrap: bool,
     pub recent_files: Vec<String>,
     pub window_width: u32,
     pub window_height: u32,
@@ -27,6 +29,7 @@ impl Default for AppConfig {
             theme: "dark".to_string(),
             font_bold: false,
             show_line_numbers: true,
+            word_wrap: false,
             recent_files: Vec::new(),
             window_width: 1200,
             window_height: 800,

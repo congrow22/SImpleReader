@@ -20,6 +20,7 @@ tauri = { version = "2.10.0", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
 
 # 직렬화
 serde = { version = "1", features = ["derive"] }
@@ -38,6 +39,10 @@ dirs = "5"
 
 # 타임스탬프
 chrono = { version = "0.4", features = ["serde"] }
+
+# Windows 레지스트리
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
 
 # 고유 ID
 uuid = { version = "1", features = ["v4"] }

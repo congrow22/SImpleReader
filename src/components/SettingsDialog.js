@@ -14,6 +14,8 @@ const fontSize = document.getElementById('setting-font-size');
 const fontSizeValue = document.getElementById('setting-font-size-value');
 const themeSelect = document.getElementById('setting-theme');
 const fontBold = document.getElementById('setting-font-bold');
+const wordWrap = document.getElementById('setting-word-wrap');
+const contextMenu = document.getElementById('setting-context-menu');
 const btnApply = document.getElementById('btn-settings-apply');
 const btnCancel = document.getElementById('btn-settings-cancel');
 const btnClose = document.getElementById('btn-settings-close');
@@ -70,6 +72,14 @@ export async function show() {
 
     themeSelect.value = currentConfig.theme || 'dark';
     fontBold.checked = currentConfig.font_bold || false;
+    wordWrap.checked = currentConfig.word_wrap || false;
+
+    // Check context menu registration status
+    try {
+        contextMenu.checked = await invoke('is_context_menu_registered');
+    } catch (e) {
+        contextMenu.checked = false;
+    }
 
     dialog.classList.remove('hidden');
 }
@@ -83,12 +93,25 @@ async function applySettings() {
         font_family: fontFamily.value,
         font_size: parseInt(fontSize.value, 10),
         theme: themeSelect.value,
-        font_bold: fontBold.checked
+        font_bold: fontBold.checked,
+        word_wrap: wordWrap.checked
     });
 
     try {
         await invoke('save_config', { config });
         currentConfig = config;
+
+        // Handle context menu registration
+        try {
+            const isRegistered = await invoke('is_context_menu_registered');
+            if (contextMenu.checked && !isRegistered) {
+                await invoke('register_context_menu');
+            } else if (!contextMenu.checked && isRegistered) {
+                await invoke('unregister_context_menu');
+            }
+        } catch (e) {
+            console.error('Failed to update context menu:', e);
+        }
 
         if (onApply) {
             onApply(config);

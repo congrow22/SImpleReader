@@ -1,5 +1,5 @@
 {
-  "name": "SImpleReader",
+  "name": "SimpleReader",
   "version": "0.1.0",
   "description": "대용량 텍스트 리더",
   "scripts": {

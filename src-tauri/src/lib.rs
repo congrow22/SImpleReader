@@ -31,6 +31,22 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // When a second instance is launched, bring existing window to front
+            // and open the file passed as argument
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+            if args.len() > 1 {
+                let file_path = args[1].clone();
+                let path = std::path::Path::new(&file_path);
+                if path.exists() && path.is_file() {
+                    use tauri::Emitter;
+                    let _ = app.emit("open-file-from-args", file_path);
+                }
+            }
+        }))
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -39,6 +55,23 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Check if a file path was passed as CLI argument (file association)
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() > 1 {
+                let file_path = args[1].clone();
+                let path = std::path::Path::new(&file_path);
+                if path.exists() && path.is_file() {
+                    use tauri::Emitter;
+                    let handle = app.handle().clone();
+                    // Emit after a short delay to ensure frontend is ready
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                        let _ = handle.emit("open-file-from-args", file_path);
+                    });
+                }
+            }
+
             Ok(())
         })
         .manage(app_state)
@@ -78,6 +111,10 @@ pub fn run() {
             // Config commands
             commands::get_config,
             commands::save_config,
+            // Shell context menu commands
+            commands::register_context_menu,
+            commands::unregister_context_menu,
+            commands::is_context_menu_registered,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

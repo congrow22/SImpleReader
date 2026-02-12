@@ -1,5 +1,5 @@
 /* ========================================
-   SImpleReader - Dark Theme Styles
+   SimpleReader - Dark Theme Styles
    ======================================== */
 
 :root {
@@ -447,27 +447,6 @@ html, body {
     color: var(--text-primary);
 }
 
-.tab-new-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    margin: 0 4px;
-    border: none;
-    background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: 3px;
-    font-size: 18px;
-    flex-shrink: 0;
-    transition: all var(--transition-fast);
-}
-
-.tab-new-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
 
 /* ========================================
    Main Content Area
@@ -1043,6 +1022,20 @@ html, body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: geometricPrecision;
+}
+
+.editor-container.word-wrap .editor-scroll-area {
+    overflow-x: hidden;
+}
+
+.editor-container.word-wrap .editor-line {
+    white-space: pre-wrap;
+}
+
+.editor-container.word-wrap .line-content {
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: break-word;
 }
 
 .editor-container.edit-mode .line-content {

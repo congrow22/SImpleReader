@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SImpleReader</title>
+    <title>SimpleReader</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -107,7 +107,7 @@
         <!-- Tab Bar -->
         <div id="tab-bar" class="tab-bar">
             <div class="tab-list" id="tab-list"></div>
-            <button class="tab-new-btn" id="btn-new-tab" title="새 파일 열기">+</button>
+
         </div>
 
         <!-- Main Content -->
@@ -184,7 +184,7 @@
                 <div id="editor-container" class="editor-container">
                     <div class="editor-welcome" id="editor-welcome">
                         <div class="welcome-content">
-                            <h2>SImpleReader</h2>
+                            <h2>SimpleReader</h2>
                             <p>대용량 텍스트 파일 뷰어</p>
                             <div class="welcome-actions">
                                 <button class="welcome-btn" id="btn-welcome-open">파일 열기 (Ctrl+O)</button>
@@ -252,6 +252,17 @@
                 <div class="setting-group">
                     <label class="setting-label">
                         <input type="checkbox" id="setting-font-bold" /> 글꼴 굵게 (Bold)
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <input type="checkbox" id="setting-word-wrap" /> 자동 줄 바꿈 (Word Wrap)
+                    </label>
+                </div>
+                <hr style="border: none; border-top: 1px solid var(--border-color); margin: 8px 0;" />
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <input type="checkbox" id="setting-context-menu" /> 우클릭 메뉴에 "Open with SimpleReader" 등록
                     </label>
                 </div>
             </div>
