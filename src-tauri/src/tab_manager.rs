@@ -1,0 +1,277 @@
+use crate::text_buffer::TextBuffer;
+use serde::Serialize;
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+pub struct Tab {
+    pub path: PathBuf,
+    pub buffer: Option<TextBuffer>,
+    pub last_position: usize,
+    pub is_modified: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FileInfo {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub total_lines: usize,
+    pub total_chars: usize,
+    pub last_position: usize,
+    pub is_modified: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TabInfo {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub is_active: bool,
+    pub is_modified: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TextChunk {
+    pub lines: Vec<String>,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub total_lines: usize,
+}
+
+pub struct TabManager {
+    tabs: HashMap<String, Tab>,
+    pub active_tab: Option<String>,
+}
+
+impl TabManager {
+    pub fn new() -> Self {
+        Self {
+            tabs: HashMap::new(),
+            active_tab: None,
+        }
+    }
+
+    /// Open a file in a new tab (or switch to it if already open).
+    /// Returns FileInfo about the opened file.
+    pub fn open_file(&mut self, path: &str, last_position: usize) -> anyhow::Result<FileInfo> {
+        // If already open, just switch to it
+        if self.tabs.contains_key(path) {
+            return self.switch_tab(path);
+        }
+
+        let file_path = PathBuf::from(path);
+        if !file_path.exists() {
+            anyhow::bail!("File not found: {}", path);
+        }
+
+        let buffer = TextBuffer::from_file(&file_path)?;
+        let total_lines = buffer.get_total_lines();
+        let total_chars = buffer.get_total_chars();
+
+        let tab = Tab {
+            path: file_path.clone(),
+            buffer: Some(buffer),
+            last_position,
+            is_modified: false,
+        };
+
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.to_string());
+
+        self.tabs.insert(path.to_string(), tab);
+        self.active_tab = Some(path.to_string());
+
+        Ok(FileInfo {
+            id: path.to_string(),
+            name: file_name,
+            path: path.to_string(),
+            total_lines,
+            total_chars,
+            last_position,
+            is_modified: false,
+        })
+    }
+
+    /// Close a tab. Returns the last_position so caller can persist it.
+    pub fn close_tab(&mut self, id: &str) -> anyhow::Result<usize> {
+        let tab = self
+            .tabs
+            .remove(id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", id))?;
+
+        let last_position = tab.last_position;
+
+        // If we closed the active tab, pick another one
+        if self.active_tab.as_deref() == Some(id) {
+            self.active_tab = self.tabs.keys().next().cloned();
+        }
+
+        Ok(last_position)
+    }
+
+    /// Switch to an existing tab, lazy-loading the rope if it was unloaded.
+    pub fn switch_tab(&mut self, id: &str) -> anyhow::Result<FileInfo> {
+        // Unload rope from the previously active tab to save memory
+        if let Some(prev_id) = &self.active_tab {
+            if prev_id != id {
+                let prev_id_clone = prev_id.clone();
+                if let Some(prev_tab) = self.tabs.get_mut(&prev_id_clone) {
+                    // Keep modified tabs loaded
+                    if !prev_tab.is_modified {
+                        prev_tab.buffer = None;
+                    }
+                }
+            }
+        }
+
+        let tab = self
+            .tabs
+            .get_mut(id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", id))?;
+
+        // Lazy-load rope if needed
+        if tab.buffer.is_none() {
+            tab.buffer = Some(TextBuffer::from_file(&tab.path)?);
+        }
+
+        let buffer = tab.buffer.as_ref().unwrap();
+        let total_lines = buffer.get_total_lines();
+        let total_chars = buffer.get_total_chars();
+        let last_position = tab.last_position;
+        let is_modified = tab.is_modified;
+        let path_str = tab.path.to_string_lossy().to_string();
+        let name = tab
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path_str.clone());
+
+        self.active_tab = Some(id.to_string());
+
+        Ok(FileInfo {
+            id: id.to_string(),
+            name,
+            path: path_str,
+            total_lines,
+            total_chars,
+            last_position,
+            is_modified,
+        })
+    }
+
+    /// Get info about all open tabs.
+    pub fn get_open_tabs(&self) -> Vec<TabInfo> {
+        self.tabs
+            .iter()
+            .map(|(id, tab)| {
+                let name = tab
+                    .path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| id.clone());
+                TabInfo {
+                    id: id.clone(),
+                    name,
+                    path: tab.path.to_string_lossy().to_string(),
+                    is_active: self.active_tab.as_deref() == Some(id.as_str()),
+                    is_modified: tab.is_modified,
+                }
+            })
+            .collect()
+    }
+
+    /// Get a text chunk from the active (or specified) tab.
+    pub fn get_text_chunk(
+        &self,
+        file_id: &str,
+        start_line: usize,
+        end_line: usize,
+    ) -> anyhow::Result<TextChunk> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let buffer = tab
+            .buffer
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Buffer not loaded for tab: {}", file_id))?;
+
+        let total_lines = buffer.get_total_lines();
+        let actual_end = end_line.min(total_lines);
+        let lines = buffer.get_chunk(start_line, actual_end);
+
+        Ok(TextChunk {
+            lines,
+            start_line,
+            end_line: actual_end,
+            total_lines,
+        })
+    }
+
+    /// Get total lines for a file.
+    pub fn get_total_lines(&self, file_id: &str) -> anyhow::Result<usize> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let buffer = tab
+            .buffer
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Buffer not loaded for tab: {}", file_id))?;
+        Ok(buffer.get_total_lines())
+    }
+
+    /// Get a mutable reference to a tab's buffer.
+    pub fn get_buffer_mut(&mut self, file_id: &str) -> anyhow::Result<&mut TextBuffer> {
+        let tab = self
+            .tabs
+            .get_mut(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        tab.buffer
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Buffer not loaded for tab: {}", file_id))
+    }
+
+    /// Get an immutable reference to a tab's buffer.
+    pub fn get_buffer(&self, file_id: &str) -> anyhow::Result<&TextBuffer> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        tab.buffer
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Buffer not loaded for tab: {}", file_id))
+    }
+
+    /// Mark a tab as modified.
+    pub fn set_modified(&mut self, file_id: &str, modified: bool) {
+        if let Some(tab) = self.tabs.get_mut(file_id) {
+            tab.is_modified = modified;
+        }
+    }
+
+    /// Save the file for a tab.
+    pub fn save_file(&mut self, file_id: &str) -> anyhow::Result<()> {
+        let tab = self
+            .tabs
+            .get_mut(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let path = tab.path.clone();
+        if let Some(buffer) = tab.buffer.as_mut() {
+            buffer.save(&path)?;
+            tab.is_modified = false;
+        } else {
+            anyhow::bail!("Buffer not loaded for tab: {}", file_id);
+        }
+        Ok(())
+    }
+
+    /// Update the last reading position for a tab.
+    pub fn set_last_position(&mut self, file_id: &str, position: usize) {
+        if let Some(tab) = self.tabs.get_mut(file_id) {
+            tab.last_position = position;
+        }
+    }
+}

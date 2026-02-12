@@ -1,8 +1,66 @@
+/* ========================================
+   SImpleReader - Dark Theme Styles
+   ======================================== */
+
 :root {
-    --bg-color: #1a1a1a;
-    --text-color: #f0f0f0;
-    --accent-color: #4a9eff;
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #252526;
+    --bg-tertiary: #2d2d2d;
+    --bg-hover: #2a2d2e;
+    --bg-active: #37373d;
+    --bg-input: #3c3c3c;
+    --bg-dropdown: #252526;
+    --bg-modal: #2d2d2d;
+    --bg-overlay: rgba(0, 0, 0, 0.5);
+
+    --text-primary: #d4d4d4;
+    --text-secondary: #858585;
+    --text-muted: #6a6a6a;
+    --text-accent: #4a9eff;
+    --text-highlight: #ffffff;
+
+    --accent: #4a9eff;
+    --accent-hover: #3a8eef;
+    --accent-dim: rgba(74, 158, 255, 0.15);
+
+    --border: #333333;
+    --border-light: #444444;
+    --border-focus: #4a9eff;
+
+    --danger: #f44747;
+    --warning: #cca700;
+    --success: #6a9955;
+
+    --scrollbar-bg: #1e1e1e;
+    --scrollbar-thumb: #424242;
+    --scrollbar-thumb-hover: #555555;
+
+    --tab-active-bg: #1e1e1e;
+    --tab-inactive-bg: #2d2d2d;
+    --tab-border: #333333;
+
+    --line-number-color: #858585;
+    --line-highlight: rgba(255, 255, 255, 0.04);
+    --search-highlight: rgba(255, 215, 0, 0.3);
+    --search-highlight-active: rgba(255, 215, 0, 0.6);
+
+    --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    --font-mono: 'Consolas', 'D2Coding', 'Courier New', monospace;
+    --font-size-editor: 16px;
+    --line-height-editor: 1.5;
+
+    --menu-height: 30px;
+    --tab-height: 35px;
+    --status-height: 24px;
+    --sidebar-width: 240px;
+
+    --transition-fast: 0.1s ease;
+    --transition-normal: 0.2s ease;
 }
+
+/* ========================================
+   Reset & Base
+   ======================================== */
 
 * {
     margin: 0;
@@ -10,13 +68,1149 @@
     box-sizing: border-box;
 }
 
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg-color);
-    color: var(--text-color);
-    min-height: 100vh;
+html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ========================================
+   Scrollbar
+   ======================================== */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-corner {
+    background: var(--scrollbar-bg);
+}
+
+/* ========================================
+   Menu Bar
+   ======================================== */
+
+.menu-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--menu-height);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    padding: 0 4px;
+    -webkit-app-region: drag;
+    flex-shrink: 0;
+}
+
+.menu-left, .menu-right {
+    display: flex;
+    align-items: center;
+    -webkit-app-region: no-drag;
+}
+
+.menu-item {
+    position: relative;
+    padding: 2px 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background var(--transition-fast);
+}
+
+.menu-item:hover,
+.menu-item.active {
+    background: var(--bg-hover);
+}
+
+.menu-label {
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.menu-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 200px;
+    background: var(--bg-dropdown);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    padding: 4px 0;
+}
+
+.menu-item.active .menu-dropdown {
+    display: block;
+}
+
+.menu-dropdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 24px 6px 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: background var(--transition-fast);
+}
+
+.menu-dropdown-item:hover {
+    background: var(--accent);
+    color: var(--text-highlight);
+}
+
+.menu-dropdown-item:hover .shortcut {
+    color: var(--text-highlight);
+}
+
+.shortcut {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-left: 24px;
+}
+
+.menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+}
+
+.menu-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all var(--transition-fast);
+}
+
+.menu-icon-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Tab Bar
+   ======================================== */
+
+.tab-bar {
+    display: flex;
+    align-items: center;
+    height: var(--tab-height);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-shrink: 0;
+}
+
+.tab-bar::-webkit-scrollbar {
+    height: 0;
+}
+
+.tab-list {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    flex: 1;
+    min-width: 0;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    height: 100%;
+    background: var(--tab-inactive-bg);
+    border-right: 1px solid var(--tab-border);
+    cursor: pointer;
+    min-width: 0;
+    max-width: 200px;
+    flex-shrink: 0;
+    transition: background var(--transition-fast);
+    position: relative;
+}
+
+.tab::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: transparent;
+    transition: background var(--transition-fast);
+}
+
+.tab:hover {
+    background: var(--bg-hover);
+}
+
+.tab.active {
+    background: var(--tab-active-bg);
+}
+
+.tab.active::after {
+    background: var(--accent);
+}
+
+.tab-name {
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-modified {
+    color: var(--text-accent);
+    font-size: 14px;
+    flex-shrink: 0;
+    display: none;
+}
+
+.tab.modified .tab-modified {
+    display: inline;
+}
+
+.tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 14px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: all var(--transition-fast);
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+    opacity: 1;
+}
+
+.tab-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.tab-new-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 0 4px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 18px;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.tab-new-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Main Content Area
+   ======================================== */
+
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ========================================
+   Bookmark Panel (Sidebar)
+   ======================================== */
+
+.bookmark-panel {
+    width: var(--sidebar-width);
+    min-width: 180px;
+    max-width: 400px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: width var(--transition-normal);
+}
+
+.bookmark-panel.collapsed {
+    width: 0;
+    min-width: 0;
+    border-right: none;
+    overflow: hidden;
+}
+
+.bookmark-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.bookmark-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+}
+
+.bookmark-toggle-btn {
+    font-size: 11px;
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all var(--transition-fast);
+}
+
+.bookmark-toggle-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.bookmark-toggle-btn.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.bookmark-search {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.bookmark-search input {
+    width: 100%;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.bookmark-search input:focus {
+    border-color: var(--border-focus);
+}
+
+.bookmark-search input::placeholder {
+    color: var(--text-muted);
+}
+
+.bookmark-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.bookmark-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all var(--transition-fast);
+}
+
+.bookmark-item:hover {
+    background: var(--bg-hover);
+    border-left-color: var(--accent);
+}
+
+.bookmark-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.bookmark-item-memo {
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bookmark-item-location {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.bookmark-item-file {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bookmark-item-delete {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+    opacity: 0;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all var(--transition-fast);
+}
+
+.bookmark-item:hover .bookmark-item-delete {
+    opacity: 1;
+}
+
+.bookmark-item-delete:hover {
+    background: rgba(244, 71, 71, 0.2);
+    color: var(--danger);
+}
+
+.bookmark-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 13px;
     padding: 20px;
+    text-align: center;
+}
+
+/* ========================================
+   Resize Handle
+   ======================================== */
+
+.resize-handle {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+    background: var(--accent);
+}
+
+.bookmark-panel.collapsed + .resize-handle {
+    display: none;
+}
+
+/* ========================================
+   Editor Area
+   ======================================== */
+
+.editor-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.editor-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-welcome {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.welcome-content {
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.welcome-content h2 {
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.welcome-content p {
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.welcome-actions {
+    margin-bottom: 16px;
+}
+
+.welcome-btn {
+    padding: 8px 20px;
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.welcome-btn:hover {
+    background: var(--accent-hover);
+}
+
+.welcome-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.editor-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-editor);
+    line-height: var(--line-height-editor);
+}
+
+.editor-line {
+    display: flex;
+    min-height: calc(var(--font-size-editor) * var(--line-height-editor));
+    padding: 0 16px 0 0;
+    white-space: pre;
+}
+
+.editor-line:hover {
+    background: var(--line-highlight);
+}
+
+.editor-line.current-line {
+    background: var(--line-highlight);
+}
+
+.editor-line.search-match {
+    background: var(--search-highlight);
+}
+
+.editor-line.search-match-active {
+    background: var(--search-highlight-active);
+}
+
+.line-number {
+    display: inline-block;
+    min-width: 60px;
+    padding: 0 16px 0 12px;
+    text-align: right;
+    color: var(--line-number-color);
+    user-select: none;
+    -webkit-user-select: none;
+    flex-shrink: 0;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+.line-content {
+    flex: 1;
+    white-space: pre;
+    cursor: text;
+    user-select: text;
+    -webkit-user-select: text;
+    min-width: 0;
+    word-break: keep-all;
+    overflow-wrap: normal;
+}
+
+.line-content.editing {
+    outline: none;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.line-content mark {
+    background: var(--search-highlight);
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
+}
+
+.line-content mark.active {
+    background: var(--search-highlight-active);
+}
+
+/* ========================================
+   Search Dialog (Floating)
+   ======================================== */
+
+.search-dialog {
+    position: absolute;
+    top: 8px;
+    right: 24px;
+    z-index: 100;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 8px;
+    min-width: 380px;
+}
+
+.search-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.search-row, .replace-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.search-dialog input[type="text"] {
+    flex: 1;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+    min-width: 0;
+}
+
+.search-dialog input[type="text"]:focus {
+    border-color: var(--border-focus);
+}
+
+.search-dialog input[type="text"]::placeholder {
+    color: var(--text-muted);
+}
+
+.search-option {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 6px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.search-option input[type="checkbox"] {
+    display: none;
+}
+
+.search-option:has(input:checked) {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.search-count {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    padding: 0 4px;
+    flex-shrink: 0;
+}
+
+.search-nav-btn, .search-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 14px;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.search-nav-btn:hover, .search-close-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.replace-btn {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.replace-btn:hover {
+    background: var(--bg-hover);
+}
+
+/* ========================================
+   Status Bar
+   ======================================== */
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--status-height);
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border);
+    padding: 0 12px;
+    flex-shrink: 0;
+}
+
+.status-left, .status-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-item {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 0 4px;
+}
+
+.status-separator {
+    color: var(--border-light);
+    font-size: 12px;
+}
+
+/* ========================================
+   Modal Dialogs
+   ======================================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-dialog {
+    background: var(--bg-modal);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    min-width: 360px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.modal-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    font-size: 18px;
+    transition: all var(--transition-fast);
+}
+
+.modal-close-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+}
+
+.modal-btn {
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.modal-btn-primary {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+}
+
+.modal-btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.modal-btn-secondary {
+    background: transparent;
+    color: var(--text-primary);
+}
+
+.modal-btn-secondary:hover {
+    background: var(--bg-hover);
+}
+
+/* ========================================
+   Settings Dialog
+   ======================================== */
+
+.settings-modal {
+    min-width: 400px;
+}
+
+.setting-group {
+    margin-bottom: 16px;
+}
+
+.setting-group:last-child {
+    margin-bottom: 0;
+}
+
+.setting-label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.setting-input {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 13px;
+    outline: none;
+}
+
+.setting-input:focus {
+    border-color: var(--border-focus);
+}
+
+.setting-input option {
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+.setting-range {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    margin-top: 4px;
+}
+
+.setting-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+}
+
+/* ========================================
+   Go To Line Dialog
+   ======================================== */
+
+.goto-modal {
+    min-width: 320px;
+}
+
+.goto-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.goto-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.goto-input:focus {
+    border-color: var(--border-focus);
+}
+
+.goto-input::placeholder {
+    color: var(--text-muted);
+}
+
+/* ========================================
+   Format Dialog
+   ======================================== */
+
+.format-modal {
+    min-width: 440px;
+}
+
+.format-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.format-option-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.format-option-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.format-option-btn.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.format-option-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.format-option-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.format-preview {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.format-preview h4 {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.format-preview-content {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--text-primary);
+}
+
+/* ========================================
+   Bookmark Add Dialog
+   ======================================== */
+
+.bookmark-add-modal {
+    min-width: 340px;
+}
+
+.bookmark-add-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+/* ========================================
+   Drop Overlay
+   ======================================== */
+
+.drop-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.drop-message {
+    font-size: 24px;
+    color: var(--text-primary);
+    padding: 40px 60px;
+    border: 3px dashed var(--accent);
+    border-radius: 16px;
+    background: rgba(74, 158, 255, 0.1);
+}
+
+/* ========================================
+   Utility Classes
+   ======================================== */
+
+.hidden {
+    display: none !important;
+}
+
+/* ========================================
+   Focus Styles
+   ======================================== */
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+}
+
+/* ========================================
+   Animation
+   ======================================== */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-overlay:not(.hidden) {
+    animation: fadeIn 0.15s ease;
+}
+
+/* ========================================
+   Text selection
+   ======================================== */
+
+::selection {
+    background: rgba(74, 158, 255, 0.35);
+    color: inherit;
 }

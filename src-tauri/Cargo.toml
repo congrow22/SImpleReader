@@ -19,6 +19,7 @@ tauri-build = { version = "2.5.4" }
 tauri = { version = "2.10.0" }
 tauri-plugin-log = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
 
 # 직렬화
 serde = { version = "1", features = ["derive"] }
@@ -34,6 +35,12 @@ thiserror = "1"
 
 # 경로 관리
 dirs = "5"
+
+# 타임스탬프
+chrono = { version = "0.4", features = ["serde"] }
+
+# 고유 ID
+uuid = { version = "1", features = ["v4"] }
 
 [profile.release]
 strip = true

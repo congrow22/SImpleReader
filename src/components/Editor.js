@@ -1,0 +1,451 @@
+/**
+ * Editor - Core text editor with virtual scrolling
+ * Handles large files (500k+ lines) via chunk-based rendering
+ */
+
+const { invoke } = window.__TAURI__.core;
+
+// State
+let currentFileId = null;
+let currentFilePath = null;
+let totalLines = 0;
+let lineHeight = 24;
+let renderedStartLine = -1;
+let renderedEndLine = -1;
+let currentLine = 0;
+let isEditing = false;
+let editingLineIndex = -1;
+let searchMatches = [];
+let activeMatchIndex = -1;
+let cachedChunks = new Map();
+let scrollRAF = null;
+let onModified = null;
+let onLineChange = null;
+
+// DOM elements
+const container = document.getElementById('editor-container');
+const scrollArea = document.getElementById('editor-scroll-area');
+const linesContainer = document.getElementById('editor-lines');
+const spacerTop = document.getElementById('editor-spacer-top');
+const spacerBottom = document.getElementById('editor-spacer-bottom');
+const welcome = document.getElementById('editor-welcome');
+
+// Buffer lines above and below viewport
+const BUFFER_LINES = 50;
+
+export function init(options = {}) {
+    onModified = options.onModified || null;
+    onLineChange = options.onLineChange || null;
+
+    scrollArea.addEventListener('scroll', onScroll, { passive: true });
+
+    calculateLineHeight();
+
+    window.addEventListener('resize', () => {
+        calculateLineHeight();
+        if (currentFileId) {
+            scheduleRender();
+        }
+    });
+}
+
+function calculateLineHeight() {
+    const testEl = document.createElement('div');
+    testEl.className = 'editor-line';
+    const numSpan = document.createElement('span');
+    numSpan.className = 'line-number';
+    numSpan.textContent = '1';
+    const contentSpan = document.createElement('span');
+    contentSpan.className = 'line-content';
+    contentSpan.textContent = 'X';
+    testEl.style.visibility = 'hidden';
+    testEl.style.position = 'absolute';
+    testEl.appendChild(numSpan);
+    testEl.appendChild(contentSpan);
+    linesContainer.appendChild(testEl);
+
+    const computedStyle = getComputedStyle(document.documentElement);
+    const fontSize = parseFloat(computedStyle.getPropertyValue('--font-size-editor')) || 16;
+    const lineHeightRatio = parseFloat(computedStyle.getPropertyValue('--line-height-editor')) || 1.5;
+    lineHeight = Math.ceil(fontSize * lineHeightRatio);
+
+    const measured = testEl.getBoundingClientRect().height;
+    if (measured > 0) {
+        lineHeight = Math.ceil(measured);
+    }
+
+    linesContainer.removeChild(testEl);
+}
+
+export async function loadFile(fileInfo) {
+    currentFileId = fileInfo.id;
+    currentFilePath = fileInfo.path;
+    totalLines = fileInfo.total_lines || 0;
+    currentLine = fileInfo.last_position || 0;
+    renderedStartLine = -1;
+    renderedEndLine = -1;
+    cachedChunks.clear();
+    searchMatches = [];
+    activeMatchIndex = -1;
+
+    welcome.classList.add('hidden');
+    scrollArea.classList.remove('hidden');
+
+    updateScrollHeight();
+
+    if (currentLine > 0) {
+        scrollArea.scrollTop = currentLine * lineHeight;
+    } else {
+        scrollArea.scrollTop = 0;
+    }
+
+    await renderVisibleLines(true);
+}
+
+export function clear() {
+    currentFileId = null;
+    currentFilePath = null;
+    totalLines = 0;
+    currentLine = 0;
+    renderedStartLine = -1;
+    renderedEndLine = -1;
+    cachedChunks.clear();
+    searchMatches = [];
+    activeMatchIndex = -1;
+
+    while (linesContainer.firstChild) {
+        linesContainer.removeChild(linesContainer.firstChild);
+    }
+    scrollArea.classList.add('hidden');
+    welcome.classList.remove('hidden');
+}
+
+export function getCurrentFileId() {
+    return currentFileId;
+}
+
+export function getCurrentFilePath() {
+    return currentFilePath;
+}
+
+export function getCurrentLine() {
+    return currentLine;
+}
+
+export function getTotalLines() {
+    return totalLines;
+}
+
+function updateScrollHeight() {
+    const totalHeight = totalLines * lineHeight;
+    spacerTop.style.height = '0px';
+    spacerBottom.style.height = totalHeight + 'px';
+}
+
+function onScroll() {
+    if (scrollRAF) return;
+    scrollRAF = requestAnimationFrame(async () => {
+        scrollRAF = null;
+        await renderVisibleLines();
+    });
+}
+
+function scheduleRender() {
+    if (scrollRAF) cancelAnimationFrame(scrollRAF);
+    scrollRAF = requestAnimationFrame(async () => {
+        scrollRAF = null;
+        await renderVisibleLines(true);
+    });
+}
+
+async function renderVisibleLines(force = false) {
+    if (!currentFileId || totalLines === 0) return;
+
+    const scrollTop = scrollArea.scrollTop;
+    const viewportHeight = scrollArea.clientHeight;
+
+    const firstVisible = Math.floor(scrollTop / lineHeight);
+    const visibleCount = Math.ceil(viewportHeight / lineHeight);
+
+    const startLine = Math.max(0, firstVisible - BUFFER_LINES);
+    const endLine = Math.min(totalLines, firstVisible + visibleCount + BUFFER_LINES);
+
+    const newCurrentLine = firstVisible + 1;
+    if (newCurrentLine !== currentLine) {
+        currentLine = newCurrentLine;
+        if (onLineChange) onLineChange(currentLine, totalLines);
+    }
+
+    if (!force && startLine >= renderedStartLine && endLine <= renderedEndLine) {
+        return;
+    }
+
+    try {
+        const chunk = await getChunk(startLine, endLine);
+        if (!chunk) return;
+
+        spacerTop.style.height = (startLine * lineHeight) + 'px';
+        spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight) + 'px';
+
+        renderLines(chunk.lines, startLine);
+
+        renderedStartLine = startLine;
+        renderedEndLine = endLine;
+    } catch (err) {
+        console.error('Failed to render lines:', err);
+    }
+}
+
+async function getChunk(startLine, endLine) {
+    const cacheKey = startLine + '-' + endLine;
+    if (cachedChunks.has(cacheKey)) {
+        return cachedChunks.get(cacheKey);
+    }
+
+    try {
+        const chunk = await invoke('get_text_chunk', {
+            fileId: currentFileId,
+            startLine: startLine,
+            endLine: endLine
+        });
+
+        if (cachedChunks.size > 10) {
+            const firstKey = cachedChunks.keys().next().value;
+            cachedChunks.delete(firstKey);
+        }
+        cachedChunks.set(cacheKey, chunk);
+
+        return chunk;
+    } catch (err) {
+        console.error('Failed to get chunk:', err);
+        return null;
+    }
+}
+
+function renderLines(lines, startLine) {
+    const fragment = document.createDocumentFragment();
+
+    // Build a set of lines that have search matches for quick lookup
+    const matchesByLine = new Map();
+    searchMatches.forEach((m, idx) => {
+        if (!matchesByLine.has(m.line)) {
+            matchesByLine.set(m.line, []);
+        }
+        matchesByLine.get(m.line).push({ match: m, globalIdx: idx });
+    });
+
+    const activeMatchLine = (activeMatchIndex >= 0 && searchMatches[activeMatchIndex])
+        ? searchMatches[activeMatchIndex].line : -1;
+
+    for (let i = 0; i < lines.length; i++) {
+        const lineNum = startLine + i + 1; // 1-based
+        const lineIdx = startLine + i;
+        const lineEl = document.createElement('div');
+        lineEl.className = 'editor-line';
+
+        if (lineNum === currentLine) {
+            lineEl.classList.add('current-line');
+        }
+        if (matchesByLine.has(lineIdx)) {
+            lineEl.classList.add('search-match');
+            if (lineIdx === activeMatchLine) {
+                lineEl.classList.add('search-match-active');
+            }
+        }
+
+        const numEl = document.createElement('span');
+        numEl.className = 'line-number';
+        numEl.textContent = lineNum;
+
+        const contentEl = document.createElement('span');
+        contentEl.className = 'line-content';
+
+        // If this line has search matches, render with highlights using safe DOM methods
+        const lineMatches = matchesByLine.get(lineIdx);
+        if (lineMatches && lineMatches.length > 0) {
+            buildHighlightedContent(contentEl, lines[i], lineMatches);
+        } else {
+            contentEl.textContent = lines[i];
+        }
+
+        // Make line editable on double click
+        const lineText = lines[i];
+        contentEl.addEventListener('dblclick', () => {
+            startLineEdit(contentEl, lineIdx, lineText);
+        });
+
+        lineEl.appendChild(numEl);
+        lineEl.appendChild(contentEl);
+        fragment.appendChild(lineEl);
+    }
+
+    while (linesContainer.firstChild) {
+        linesContainer.removeChild(linesContainer.firstChild);
+    }
+    linesContainer.appendChild(fragment);
+}
+
+function buildHighlightedContent(container, text, lineMatches) {
+    // Sort matches by char_start
+    lineMatches.sort((a, b) => a.match.char_start - b.match.char_start);
+
+    let lastEnd = 0;
+
+    for (const { match, globalIdx } of lineMatches) {
+        // Text before this match
+        if (match.char_start > lastEnd) {
+            container.appendChild(document.createTextNode(text.substring(lastEnd, match.char_start)));
+        }
+
+        // The match itself as a <mark> element
+        const mark = document.createElement('mark');
+        if (globalIdx === activeMatchIndex) {
+            mark.className = 'active';
+        }
+        mark.textContent = text.substring(match.char_start, match.char_end);
+        container.appendChild(mark);
+
+        lastEnd = match.char_end;
+    }
+
+    // Remaining text after last match
+    if (lastEnd < text.length) {
+        container.appendChild(document.createTextNode(text.substring(lastEnd)));
+    }
+}
+
+function startLineEdit(contentEl, lineIndex, originalText) {
+    if (isEditing) return;
+
+    isEditing = true;
+    editingLineIndex = lineIndex;
+
+    contentEl.classList.add('editing');
+    contentEl.contentEditable = 'true';
+    contentEl.textContent = originalText;
+    contentEl.focus();
+
+    const finishEdit = async () => {
+        contentEl.contentEditable = 'false';
+        contentEl.classList.remove('editing');
+        isEditing = false;
+
+        const newText = contentEl.textContent;
+        if (newText !== originalText) {
+            try {
+                await invoke('insert_text', {
+                    fileId: currentFileId,
+                    position: lineIndex,
+                    text: newText
+                });
+
+                cachedChunks.clear();
+                if (onModified) onModified(currentFileId);
+                scheduleRender();
+            } catch (err) {
+                console.error('Edit failed:', err);
+                contentEl.textContent = originalText;
+            }
+        }
+
+        editingLineIndex = -1;
+    };
+
+    contentEl.addEventListener('blur', finishEdit, { once: true });
+    contentEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            contentEl.blur();
+        }
+        if (e.key === 'Escape') {
+            contentEl.textContent = originalText;
+            contentEl.blur();
+        }
+    });
+}
+
+export function setSearchMatches(matches, activeIndex = -1) {
+    searchMatches = matches || [];
+    activeMatchIndex = activeIndex;
+    cachedChunks.clear();
+    scheduleRender();
+}
+
+export function setActiveMatch(index) {
+    activeMatchIndex = index;
+    if (index >= 0 && index < searchMatches.length) {
+        scrollToLine(searchMatches[index].line + 1);
+    }
+    cachedChunks.clear();
+    scheduleRender();
+}
+
+export function clearSearchHighlights() {
+    searchMatches = [];
+    activeMatchIndex = -1;
+    cachedChunks.clear();
+    scheduleRender();
+}
+
+export function scrollToLine(lineNumber) {
+    if (lineNumber < 1 || lineNumber > totalLines) return;
+    const targetScroll = (lineNumber - 1) * lineHeight;
+    const viewportHeight = scrollArea.clientHeight;
+    scrollArea.scrollTop = targetScroll - (viewportHeight / 2) + (lineHeight / 2);
+    currentLine = lineNumber;
+    if (onLineChange) onLineChange(currentLine, totalLines);
+}
+
+export async function refreshContent() {
+    if (!currentFileId) return;
+
+    try {
+        const lines = await invoke('get_total_lines', { fileId: currentFileId });
+        totalLines = lines;
+        updateScrollHeight();
+        cachedChunks.clear();
+        await renderVisibleLines(true);
+    } catch (err) {
+        console.error('Failed to refresh:', err);
+    }
+}
+
+export function updateFontSize(size) {
+    document.documentElement.style.setProperty('--font-size-editor', size + 'px');
+    calculateLineHeight();
+    updateScrollHeight();
+    cachedChunks.clear();
+    scheduleRender();
+}
+
+export function updateFontFamily(family) {
+    document.documentElement.style.setProperty('--font-mono', family);
+    calculateLineHeight();
+    updateScrollHeight();
+    cachedChunks.clear();
+    scheduleRender();
+}
+
+export async function undo() {
+    if (!currentFileId) return;
+    try {
+        await invoke('undo', { fileId: currentFileId });
+        cachedChunks.clear();
+        await refreshContent();
+        if (onModified) onModified(currentFileId);
+    } catch (err) {
+        console.error('Undo failed:', err);
+    }
+}
+
+export async function redo() {
+    if (!currentFileId) return;
+    try {
+        await invoke('redo', { fileId: currentFileId });
+        cachedChunks.clear();
+        await refreshContent();
+        if (onModified) onModified(currentFileId);
+    } catch (err) {
+        console.error('Redo failed:', err);
+    }
+}

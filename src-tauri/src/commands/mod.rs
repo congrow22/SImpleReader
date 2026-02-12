@@ -1,10 +1,13 @@
-mod file;
+pub mod bookmark;
+pub mod config;
+pub mod edit;
+pub mod file;
+pub mod format;
+pub mod search;
 
+pub use bookmark::*;
+pub use config::*;
+pub use edit::*;
 pub use file::*;
-
-use tauri::command;
-
-#[command]
-pub fn greet(name: &str) -> String {
-    format!("Hello, {}! Welcome to SImpleReader.", name)
-}
+pub use format::*;
+pub use search::*;

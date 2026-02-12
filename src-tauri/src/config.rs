@@ -6,6 +6,9 @@ pub struct AppConfig {
     pub font_family: String,
     pub font_size: u32,
     pub theme: String,
+    pub recent_files: Vec<String>,
+    pub window_width: u32,
+    pub window_height: u32,
 }
 
 impl Default for AppConfig {
@@ -14,6 +17,9 @@ impl Default for AppConfig {
             font_family: "Segoe UI".to_string(),
             font_size: 14,
             theme: "dark".to_string(),
+            recent_files: Vec::new(),
+            window_width: 1200,
+            window_height: 800,
         }
     }
 }
@@ -40,8 +46,8 @@ impl AppConfig {
     }
 
     fn config_path() -> anyhow::Result<PathBuf> {
-        let config_dir = dirs::config_dir()
-            .ok_or_else(|| anyhow::anyhow!("Could not find config directory"))?;
-        Ok(config_dir.join(env!("CARGO_PKG_NAME")).join("config.json"))
+        let home = dirs::home_dir()
+            .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+        Ok(home.join(".simple-reader").join("config.json"))
     }
 }
