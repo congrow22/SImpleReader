@@ -11,19 +11,9 @@ pub async fn add_bookmark(
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
-    // Calculate line from position using tab manager if the file is open
-    let line = {
-        let tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
-        if let Ok(buffer) = tab_manager.get_buffer(&file_path) {
-            let total_chars = buffer.get_total_chars();
-            let pos = position.min(total_chars);
-            buffer.rope().char_to_line(pos)
-        } else {
-            0
-        }
-    };
+    // position from frontend is already a line number
     store
-        .add_bookmark(&file_path, position, line, &memo)
+        .add_bookmark(&file_path, position, position, &memo)
         .map_err(|e| e.to_string())
 }
 

@@ -40,6 +40,11 @@ export function init(actionHandler) {
         });
     });
 
+    // Bookmark button
+    document.getElementById('btn-bookmark').addEventListener('click', () => {
+        if (onAction) onAction('add-bookmark');
+    });
+
     // Settings button
     document.getElementById('btn-settings').addEventListener('click', () => {
         if (onAction) onAction('settings');

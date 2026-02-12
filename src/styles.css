@@ -124,14 +124,12 @@ html, body {
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border);
     padding: 0 4px;
-    -webkit-app-region: drag;
     flex-shrink: 0;
 }
 
 .menu-left, .menu-right {
     display: flex;
     align-items: center;
-    -webkit-app-region: no-drag;
 }
 
 .menu-item {

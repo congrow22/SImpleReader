@@ -2,7 +2,7 @@
  * TabBar - File tab management
  */
 
-const { invoke } = window.__TAURI__.core;
+import { invoke } from '@tauri-apps/api/core';
 
 let tabs = [];
 let activeTabId = null;

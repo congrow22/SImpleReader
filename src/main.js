@@ -11,8 +11,9 @@ import * as SearchDialog from './components/SearchDialog.js';
 import * as SettingsDialog from './components/SettingsDialog.js';
 import * as FormatDialog from './components/FormatDialog.js';
 import * as GoToLineDialog from './components/GoToLineDialog.js';
-
-const { invoke } = window.__TAURI__.core;
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 // ============================================================
 // Application State
@@ -370,27 +371,25 @@ function initDragAndDrop() {
 
     // Also listen for Tauri drag-drop events
     try {
-        if (window.__TAURI__ && window.__TAURI__.event) {
-            window.__TAURI__.event.listen('tauri://drag-drop', async (event) => {
-                overlay.classList.add('hidden');
-                dragCounter = 0;
-                const paths = event.payload.paths || event.payload;
-                if (Array.isArray(paths)) {
-                    for (const path of paths) {
-                        await openFile(path);
-                    }
+        listen('tauri://drag-drop', async (event) => {
+            overlay.classList.add('hidden');
+            dragCounter = 0;
+            const paths = event.payload.paths || event.payload;
+            if (Array.isArray(paths)) {
+                for (const path of paths) {
+                    await openFile(path);
                 }
-            });
+            }
+        });
 
-            window.__TAURI__.event.listen('tauri://drag-enter', () => {
-                overlay.classList.remove('hidden');
-            });
+        listen('tauri://drag-enter', () => {
+            overlay.classList.remove('hidden');
+        });
 
-            window.__TAURI__.event.listen('tauri://drag-leave', () => {
-                overlay.classList.add('hidden');
-                dragCounter = 0;
-            });
-        }
+        listen('tauri://drag-leave', () => {
+            overlay.classList.add('hidden');
+            dragCounter = 0;
+        });
     } catch (err) {
         console.warn('Tauri drag-drop events not available:', err);
     }
@@ -436,6 +435,9 @@ function handleMenuAction(action) {
         case 'toggle-bookmark-panel':
             BookmarkPanel.togglePanel();
             break;
+        case 'add-bookmark':
+            handleAddBookmark();
+            break;
         case 'settings':
             SettingsDialog.show();
             break;
@@ -451,15 +453,10 @@ function handleMenuAction(action) {
 
 async function handleOpenFile() {
     try {
-        // Try Tauri dialog plugin first
-        let filePath = null;
-
-        if (window.__TAURI__ && window.__TAURI__.dialog) {
-            filePath = await window.__TAURI__.dialog.open({
-                multiple: false,
-                filters: [{ name: 'Text Files', extensions: ['txt', 'md', 'log', 'csv', 'json'] }]
-            });
-        }
+        const filePath = await openDialog({
+            multiple: false,
+            filters: [{ name: 'Text Files', extensions: ['txt', 'md', 'log', 'csv', 'json'] }]
+        });
 
         if (filePath) {
             await openFile(filePath);

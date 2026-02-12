@@ -3,7 +3,7 @@
  * Handles large files (500k+ lines) via chunk-based rendering
  */
 
-const { invoke } = window.__TAURI__.core;
+import { invoke } from '@tauri-apps/api/core';
 
 // State
 let currentFileId = null;
@@ -129,7 +129,12 @@ export function getCurrentFilePath() {
 }
 
 export function getCurrentLine() {
-    return currentLine;
+    // 스크롤 위치에서 직접 계산 (뷰포트 중앙 기준)
+    if (!currentFileId || totalLines === 0) return currentLine;
+    const scrollTop = scrollArea.scrollTop;
+    const viewportHeight = scrollArea.clientHeight;
+    const centerLine = Math.floor((scrollTop + viewportHeight / 2) / lineHeight) + 1;
+    return Math.max(1, Math.min(centerLine, totalLines));
 }
 
 export function getTotalLines() {

@@ -2,7 +2,7 @@
  * FormatDialog - Text formatting dialog
  */
 
-const { invoke } = window.__TAURI__.core;
+import { invoke } from '@tauri-apps/api/core';
 
 let currentFileId = null;
 let selectedFormat = null;

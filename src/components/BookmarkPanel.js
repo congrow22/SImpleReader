@@ -2,7 +2,7 @@
  * BookmarkPanel - Left sidebar bookmark management
  */
 
-const { invoke } = window.__TAURI__.core;
+import { invoke } from '@tauri-apps/api/core';
 
 let currentFilePath = null;
 let bookmarks = [];
