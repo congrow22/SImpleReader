@@ -86,6 +86,17 @@ pub async fn search_bookmarks(
 }
 
 #[command]
+pub async fn toggle_favorite(
+    file_path: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<bool, String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .toggle_favorite(&file_path)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
 pub async fn save_last_position(
     file_path: String,
     position: usize,

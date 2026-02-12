@@ -504,6 +504,56 @@ html, body {
     overflow: hidden;
 }
 
+/* Panel Toolbar */
+.panel-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.panel-toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all var(--transition-fast);
+}
+
+.panel-toolbar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* Sidebar Reopen Button */
+.sidebar-reopen-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-reopen-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
 /* Panel Tabs */
 .panel-tabs {
     display: flex;
@@ -543,6 +593,16 @@ html, body {
 
 .panel-view.hidden {
     display: none;
+}
+
+/* File List Header */
+.file-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
 
 /* File List */
@@ -597,6 +657,31 @@ html, body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.file-list-item-star {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-right: 4px;
+    transition: all var(--transition-fast);
+}
+
+.file-list-item-star:hover {
+    color: var(--warning);
+}
+
+.file-list-item-star.active {
+    color: var(--warning);
 }
 
 .file-list-item-delete {
@@ -938,6 +1023,10 @@ html, body {
     flex-shrink: 0;
     font-size: inherit;
     font-family: inherit;
+}
+
+.editor-container.hide-line-numbers .line-number {
+    display: none;
 }
 
 .line-content {

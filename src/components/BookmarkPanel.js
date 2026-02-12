@@ -15,6 +15,7 @@ let onFileClick = null;
 let onFileRemove = null;
 let activeView = 'files'; // 'files' or 'bookmarks'
 let fileList = [];
+let showFavoritesOnly = false;
 
 // DOM
 const panel = document.getElementById('bookmark-panel');
@@ -26,6 +27,8 @@ const fileListView = document.getElementById('file-list-view');
 const bookmarkView = document.getElementById('bookmark-view');
 const tabFiles = document.getElementById('panel-tab-files');
 const tabBookmarks = document.getElementById('panel-tab-bookmarks');
+
+const favoritesBtn = document.getElementById('btn-toggle-favorites');
 
 export function init(options = {}) {
     onBookmarkClick = options.onBookmarkClick || null;
@@ -49,6 +52,15 @@ export function init(options = {}) {
         toggleBtn.classList.toggle('active', isAllMode);
         refreshBookmarks();
     });
+
+    // Favorites filter toggle
+    if (favoritesBtn) {
+        favoritesBtn.addEventListener('click', () => {
+            showFavoritesOnly = !showFavoritesOnly;
+            favoritesBtn.classList.toggle('active', showFavoritesOnly);
+            renderFileList();
+        });
+    }
 
     // Load file list on init
     refreshFileList();
@@ -89,20 +101,33 @@ function renderFileList() {
         fileListContainer.removeChild(fileListContainer.firstChild);
     }
 
-    if (fileList.length === 0) {
+    const filtered = showFavoritesOnly ? fileList.filter(e => e.favorite) : fileList;
+
+    if (filtered.length === 0) {
         const emptyEl = document.createElement('div');
         emptyEl.className = 'bookmark-empty';
-        emptyEl.textContent = '\uC5F4\uC5B4\uBCF8 \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4';
+        emptyEl.textContent = showFavoritesOnly ? '\uC990\uACA8\uCC3E\uAE30\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4' : '\uC5F4\uC5B4\uBCF8 \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4';
         fileListContainer.appendChild(emptyEl);
         return;
     }
 
-    fileList.forEach((entry) => {
+    filtered.forEach((entry) => {
         const item = document.createElement('div');
         item.className = 'file-list-item';
         if (entry.file_path === currentFilePath) {
             item.classList.add('active');
         }
+
+        // Favorite star button
+        const starBtn = document.createElement('button');
+        starBtn.className = 'file-list-item-star' + (entry.favorite ? ' active' : '');
+        starBtn.title = entry.favorite ? '\uC990\uACA8\uCC3E\uAE30 \uD574\uC81C' : '\uC990\uACA8\uCC3E\uAE30';
+        starBtn.textContent = entry.favorite ? '\u2605' : '\u2606';
+        starBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFavorite(entry.file_path);
+        });
+        item.appendChild(starBtn);
 
         const content = document.createElement('div');
         content.className = 'file-list-item-content';
@@ -164,6 +189,15 @@ function renderFileList() {
 
         fileListContainer.appendChild(item);
     });
+}
+
+async function toggleFavorite(filePath) {
+    try {
+        await invoke('toggle_favorite', { filePath: filePath });
+        await refreshFileList();
+    } catch (err) {
+        console.error('Failed to toggle favorite:', err);
+    }
 }
 
 // Delete confirmation dialog

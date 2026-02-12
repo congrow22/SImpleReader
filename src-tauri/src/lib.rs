@@ -67,6 +67,7 @@ pub fn run() {
             commands::track_file_open,
             commands::get_file_list,
             commands::remove_file_entry,
+            commands::toggle_favorite,
             // Search commands
             commands::search_text,
             commands::replace_text,

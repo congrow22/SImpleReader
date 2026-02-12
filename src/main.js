@@ -67,6 +67,16 @@ async function initApp() {
         btnSave.addEventListener('click', handleSave);
     }
 
+    // Sidebar toggle buttons
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    const btnReopenSidebar = document.getElementById('btn-reopen-sidebar');
+    if (btnToggleSidebar) {
+        btnToggleSidebar.addEventListener('click', () => toggleSidebar());
+    }
+    if (btnReopenSidebar) {
+        btnReopenSidebar.addEventListener('click', () => toggleSidebar());
+    }
+
     // Edit mode toggle button
     const btnEditMode = document.getElementById('btn-edit-mode');
     if (btnEditMode) {
@@ -107,6 +117,12 @@ function applyConfig(config) {
         document.documentElement.removeAttribute('data-theme');
     }
     document.documentElement.style.setProperty('--font-weight-editor', config.font_bold ? 'bold' : 'normal');
+    // Line numbers
+    const editorContainer = document.getElementById('editor-container');
+    if (editorContainer) {
+        editorContainer.classList.toggle('hide-line-numbers', config.show_line_numbers === false);
+    }
+    updateLineNumbersMenuLabel(config.show_line_numbers !== false);
 }
 
 // ============================================================
@@ -321,6 +337,13 @@ function initKeyboardShortcuts() {
             return;
         }
 
+        // Ctrl+L: Toggle line numbers
+        if (ctrl && !shift && e.key === 'l') {
+            e.preventDefault();
+            handleToggleLineNumbers();
+            return;
+        }
+
         // Ctrl+G: Go to line
         if (ctrl && !shift && e.key === 'g') {
             e.preventDefault();
@@ -484,8 +507,11 @@ function handleMenuAction(action) {
         case 'toggle-edit-mode':
             handleToggleEditMode();
             break;
+        case 'toggle-line-numbers':
+            handleToggleLineNumbers();
+            break;
         case 'toggle-bookmark-panel':
-            BookmarkPanel.togglePanel();
+            toggleSidebar();
             break;
         case 'add-bookmark':
             handleAddBookmark();
@@ -726,6 +752,52 @@ function updateEditModeUI(editMode) {
     const statusMode = document.getElementById('status-mode');
     if (statusMode) {
         statusMode.textContent = editMode ? '편집' : '뷰어';
+    }
+}
+
+// ============================================================
+// Sidebar Toggle
+// ============================================================
+
+function toggleSidebar() {
+    BookmarkPanel.togglePanel();
+    const reopenBtn = document.getElementById('btn-reopen-sidebar');
+    if (reopenBtn) {
+        reopenBtn.classList.toggle('hidden', !BookmarkPanel.isCollapsed());
+    }
+}
+
+// ============================================================
+// Line Numbers Toggle
+// ============================================================
+
+let lineNumbersVisible = true;
+
+function updateLineNumbersMenuLabel(visible) {
+    lineNumbersVisible = visible;
+    const menuItem = document.getElementById('menu-toggle-line-numbers');
+    if (menuItem) {
+        const label = menuItem.querySelector('span:first-child');
+        if (label) {
+            label.textContent = visible ? '\u2713 \uC904 \uBC88\uD638 \uD45C\uC2DC' : '\uC904 \uBC88\uD638 \uD45C\uC2DC';
+        }
+    }
+}
+
+async function handleToggleLineNumbers() {
+    lineNumbersVisible = !lineNumbersVisible;
+    const editorContainer = document.getElementById('editor-container');
+    if (editorContainer) {
+        editorContainer.classList.toggle('hide-line-numbers', !lineNumbersVisible);
+    }
+    updateLineNumbersMenuLabel(lineNumbersVisible);
+    // Save to config
+    try {
+        const config = await invoke('get_config');
+        config.show_line_numbers = lineNumbersVisible;
+        await invoke('save_config', { config });
+    } catch (err) {
+        console.warn('Could not save line numbers setting:', err);
     }
 }
 

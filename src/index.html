@@ -50,6 +50,10 @@
                         <div class="menu-dropdown-item" data-action="format">
                             <span>텍스트 정리</span><span class="shortcut">Ctrl+Shift+F</span>
                         </div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-dropdown-item" data-action="toggle-line-numbers" id="menu-toggle-line-numbers">
+                            <span>줄 번호 표시</span><span class="shortcut">Ctrl+L</span>
+                        </div>
                     </div>
                 </div>
                 <div class="menu-item" data-menu="view">
@@ -110,6 +114,13 @@
         <div class="main-content">
             <!-- Sidebar Panel -->
             <div id="bookmark-panel" class="bookmark-panel">
+                <div class="panel-toolbar">
+                    <button class="panel-toolbar-btn" id="btn-toggle-sidebar" title="사이드바 접기">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm5-1v12h9a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H5zM4 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h2V2z"/>
+                        </svg>
+                    </button>
+                </div>
                 <div class="panel-tabs">
                     <button class="panel-tab active" id="panel-tab-files" title="열어본 파일 목록">파일</button>
                     <button class="panel-tab" id="panel-tab-bookmarks" title="책갈피">책갈피</button>
@@ -117,6 +128,9 @@
 
                 <!-- File List View -->
                 <div class="panel-view" id="file-list-view">
+                    <div class="file-list-header">
+                        <button class="bookmark-toggle-btn" id="btn-toggle-favorites" title="즐겨찾기만 보기">&#9734; 즐겨찾기</button>
+                    </div>
                     <div class="file-list" id="file-list"></div>
                 </div>
 
@@ -131,6 +145,13 @@
                     <div class="bookmark-list" id="bookmark-list"></div>
                 </div>
             </div>
+
+            <!-- Sidebar Reopen Button (visible when collapsed) -->
+            <button class="sidebar-reopen-btn hidden" id="btn-reopen-sidebar" title="사이드바 열기">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm5-1v12h9a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H5zM4 2H2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h2V2z"/>
+                </svg>
+            </button>
 
             <!-- Resize Handle -->
             <div class="resize-handle" id="sidebar-resize-handle"></div>

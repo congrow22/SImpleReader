@@ -15,6 +15,8 @@ pub struct FileBookmarks {
     pub last_position: usize,
     pub last_opened: String,
     pub bookmarks: Vec<Bookmark>,
+    #[serde(default)]
+    pub favorite: bool,
 }
 
 impl Default for FileBookmarks {
@@ -23,6 +25,7 @@ impl Default for FileBookmarks {
             last_position: 0,
             last_opened: chrono::Local::now().to_rfc3339(),
             bookmarks: Vec::new(),
+            favorite: false,
         }
     }
 }
@@ -41,6 +44,7 @@ pub struct FileListEntry {
     pub last_position: usize,
     pub last_opened: String,
     pub bookmark_count: usize,
+    pub favorite: bool,
 }
 
 pub struct BookmarkStore {
@@ -196,12 +200,25 @@ impl BookmarkStore {
                     last_position: file_bookmarks.last_position,
                     last_opened: file_bookmarks.last_opened.clone(),
                     bookmark_count: file_bookmarks.bookmarks.len(),
+                    favorite: file_bookmarks.favorite,
                 }
             })
             .collect();
         // Sort by last_opened descending (most recent first)
         entries.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
         entries
+    }
+
+    /// Toggle favorite status for a file.
+    pub fn toggle_favorite(&mut self, file_path: &str) -> anyhow::Result<bool> {
+        let entry = self
+            .data
+            .entry(file_path.to_string())
+            .or_default();
+        entry.favorite = !entry.favorite;
+        let new_state = entry.favorite;
+        self.save_to_disk()?;
+        Ok(new_state)
     }
 
     /// Remove a file entry and all its bookmarks.

@@ -1,6 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub font_family: String,
@@ -8,6 +12,8 @@ pub struct AppConfig {
     pub theme: String,
     #[serde(default)]
     pub font_bold: bool,
+    #[serde(default = "default_true")]
+    pub show_line_numbers: bool,
     pub recent_files: Vec<String>,
     pub window_width: u32,
     pub window_height: u32,
@@ -20,6 +26,7 @@ impl Default for AppConfig {
             font_size: 14,
             theme: "dark".to_string(),
             font_bold: false,
+            show_line_numbers: true,
             recent_files: Vec::new(),
             window_width: 1200,
             window_height: 800,
