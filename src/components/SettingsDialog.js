@@ -12,6 +12,8 @@ const dialog = document.getElementById('settings-dialog');
 const fontFamily = document.getElementById('setting-font-family');
 const fontSize = document.getElementById('setting-font-size');
 const fontSizeValue = document.getElementById('setting-font-size-value');
+const themeSelect = document.getElementById('setting-theme');
+const fontBold = document.getElementById('setting-font-bold');
 const btnApply = document.getElementById('btn-settings-apply');
 const btnCancel = document.getElementById('btn-settings-cancel');
 const btnClose = document.getElementById('btn-settings-close');
@@ -66,6 +68,9 @@ export async function show() {
     fontSize.value = currentConfig.font_size || 16;
     fontSizeValue.textContent = fontSize.value;
 
+    themeSelect.value = currentConfig.theme || 'dark';
+    fontBold.checked = currentConfig.font_bold || false;
+
     dialog.classList.remove('hidden');
 }
 
@@ -76,7 +81,9 @@ export function hide() {
 async function applySettings() {
     const config = Object.assign({}, currentConfig || {}, {
         font_family: fontFamily.value,
-        font_size: parseInt(fontSize.value, 10)
+        font_size: parseInt(fontSize.value, 10),
+        theme: themeSelect.value,
+        font_bold: fontBold.checked
     });
 
     try {

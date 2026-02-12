@@ -6,6 +6,8 @@ pub struct AppConfig {
     pub font_family: String,
     pub font_size: u32,
     pub theme: String,
+    #[serde(default)]
+    pub font_bold: bool,
     pub recent_files: Vec<String>,
     pub window_width: u32,
     pub window_height: u32,
@@ -17,6 +19,7 @@ impl Default for AppConfig {
             font_family: "Segoe UI".to_string(),
             font_size: 14,
             theme: "dark".to_string(),
+            font_bold: false,
             recent_files: Vec::new(),
             window_width: 1200,
             window_height: 800,

@@ -101,6 +101,12 @@ function applyConfig(config) {
     if (config.font_family) {
         document.documentElement.style.setProperty('--font-mono', config.font_family);
     }
+    if (config.theme && config.theme !== 'dark') {
+        document.documentElement.setAttribute('data-theme', config.theme);
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    document.documentElement.style.setProperty('--font-weight-editor', config.font_bold ? 'bold' : 'normal');
 }
 
 // ============================================================
@@ -178,6 +184,7 @@ function initSettingsDialog() {
             if (config.font_family) {
                 Editor.updateFontFamily(config.font_family);
             }
+            applyConfig(config);
         }
     });
 }

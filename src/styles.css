@@ -47,6 +47,7 @@
     --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     --font-mono: 'Consolas', 'D2Coding', 'Courier New', monospace;
     --font-size-editor: 16px;
+    --font-weight-editor: normal;
     --line-height-editor: 1.5;
 
     --menu-height: 40px;
@@ -56,6 +57,100 @@
 
     --transition-fast: 0.1s ease;
     --transition-normal: 0.2s ease;
+}
+
+/* ========================================
+   Sepia Theme
+   ======================================== */
+
+[data-theme="sepia"] {
+    --bg-primary: #faf6ee;
+    --bg-secondary: #f2ede4;
+    --bg-tertiary: #eae5db;
+    --bg-hover: #ece7dd;
+    --bg-active: #e2ddd3;
+    --bg-input: #f2ede4;
+    --bg-dropdown: #f2ede4;
+    --bg-modal: #f5f0e7;
+    --bg-overlay: rgba(0, 0, 0, 0.3);
+
+    --text-primary: #000000;
+    --text-secondary: #555555;
+    --text-muted: #888888;
+    --text-accent: #7a5230;
+    --text-highlight: #000000;
+
+    --accent: #7a5230;
+    --accent-hover: #6a4220;
+    --accent-dim: rgba(122, 82, 48, 0.12);
+
+    --border: #ddd8ce;
+    --border-light: #d0cbc1;
+    --border-focus: #7a5230;
+
+    --danger: #c0392b;
+    --warning: #a67c00;
+    --success: #5a8a3c;
+
+    --scrollbar-bg: #faf6ee;
+    --scrollbar-thumb: #d0cbc1;
+    --scrollbar-thumb-hover: #b8b3a9;
+
+    --tab-active-bg: #faf6ee;
+    --tab-inactive-bg: #eae5db;
+    --tab-border: #ddd8ce;
+
+    --line-number-color: #999999;
+    --line-highlight: rgba(0, 0, 0, 0.04);
+    --search-highlight: rgba(255, 180, 0, 0.35);
+    --search-highlight-active: rgba(255, 160, 0, 0.6);
+}
+
+/* ========================================
+   Light Theme
+   ======================================== */
+
+[data-theme="light"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f3f3;
+    --bg-tertiary: #e8e8e8;
+    --bg-hover: #e5e5e5;
+    --bg-active: #d6d6d6;
+    --bg-input: #ffffff;
+    --bg-dropdown: #f3f3f3;
+    --bg-modal: #ffffff;
+    --bg-overlay: rgba(0, 0, 0, 0.3);
+
+    --text-primary: #1e1e1e;
+    --text-secondary: #616161;
+    --text-muted: #9e9e9e;
+    --text-accent: #0066cc;
+    --text-highlight: #000000;
+
+    --accent: #0066cc;
+    --accent-hover: #0055aa;
+    --accent-dim: rgba(0, 102, 204, 0.1);
+
+    --border: #d4d4d4;
+    --border-light: #e0e0e0;
+    --border-focus: #0066cc;
+
+    --danger: #d32f2f;
+    --warning: #f9a825;
+    --success: #388e3c;
+
+    --scrollbar-bg: #f3f3f3;
+    --scrollbar-thumb: #c1c1c1;
+    --scrollbar-thumb-hover: #a8a8a8;
+
+    --tab-active-bg: #ffffff;
+    --tab-inactive-bg: #e8e8e8;
+    --tab-border: #d4d4d4;
+
+    --line-number-color: #9e9e9e;
+    --line-highlight: rgba(0, 0, 0, 0.04);
+    --search-highlight: rgba(255, 215, 0, 0.4);
+    --search-highlight-active: rgba(255, 180, 0, 0.7);
 }
 
 /* ========================================
@@ -854,6 +949,11 @@ html, body {
     min-width: 0;
     word-break: keep-all;
     overflow-wrap: normal;
+    font-weight: var(--font-weight-editor);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: geometricPrecision;
 }
 
 .editor-container.edit-mode .line-content {

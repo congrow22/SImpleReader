@@ -218,7 +218,20 @@
                 </div>
                 <div class="setting-group">
                     <label class="setting-label">글꼴 크기: <span id="setting-font-size-value">16</span>px</label>
-                    <input type="range" id="setting-font-size" class="setting-range" min="12" max="32" value="16" />
+                    <input type="range" id="setting-font-size" class="setting-range" min="12" max="100" value="16" />
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">테마</label>
+                    <select id="setting-theme" class="setting-input">
+                        <option value="dark">다크</option>
+                        <option value="sepia">세피아</option>
+                        <option value="light">라이트</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label">
+                        <input type="checkbox" id="setting-font-bold" /> 글꼴 굵게 (Bold)
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">
