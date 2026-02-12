@@ -26,3 +26,10 @@ Thumbs.db
 # Tauri
 /src-tauri/WixTools/
 /src-tauri/*.pdb
+
+# Test artifacts
+.playwright-mcp/
+*.png
+tauri-dev.log
+test-search.txt
+nul

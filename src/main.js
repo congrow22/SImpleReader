@@ -55,6 +55,12 @@ async function initApp() {
     initDragAndDrop();
     initWelcome();
 
+    // Open button
+    const btnOpen = document.getElementById('btn-open');
+    if (btnOpen) {
+        btnOpen.addEventListener('click', handleOpenFile);
+    }
+
     // Save button
     const btnSave = document.getElementById('btn-save');
     if (btnSave) {
@@ -529,6 +535,15 @@ async function openFile(path) {
         updateStatusBar();
     } catch (err) {
         console.error('Failed to open file:', err);
+        const shouldRemove = confirm('파일을 찾을 수 없습니다.\n목록에서 삭제하시겠습니까?\n\n' + path);
+        if (shouldRemove) {
+            try {
+                await invoke('remove_file_entry', { filePath: path });
+                BookmarkPanel.refreshFileList();
+            } catch (e) {
+                console.error('Failed to remove file entry:', e);
+            }
+        }
     }
 }
 
