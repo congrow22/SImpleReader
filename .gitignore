@@ -1,0 +1,28 @@
+# Rust
+/src-tauri/target/
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# Docs (심볼릭 링크)
+docs
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tauri
+/src-tauri/WixTools/
+/src-tauri/*.pdb
