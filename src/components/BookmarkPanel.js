@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 // State
 let currentFilePath = null;
+let currentFileType = 'text';
 let bookmarks = [];
 let allBookmarks = [];
 let isAllMode = false;
@@ -143,7 +144,8 @@ function renderFileList() {
             parts.push('\uCC45\uAC08\uD53C ' + entry.bookmark_count);
         }
         if (entry.last_position > 0) {
-            parts.push('\uC904 ' + entry.last_position);
+            const type = guessFileType(entry.file_path);
+            parts.push(formatLocation(entry.last_position, type));
         }
         metaEl.textContent = parts.join(' \u00B7 ');
         content.appendChild(metaEl);
@@ -269,11 +271,26 @@ async function removeFileEntry(filePath) {
 // Bookmarks
 // ============================================================
 
-export async function loadBookmarks(filePath) {
+export async function loadBookmarks(filePath, fileType) {
     currentFilePath = filePath;
+    currentFileType = fileType || guessFileType(filePath);
     await refreshBookmarks();
     // Re-render file list to update active state
     renderFileList();
+}
+
+function guessFileType(filePath) {
+    if (!filePath) return 'text';
+    const ext = filePath.split('.').pop().toLowerCase();
+    if (ext === 'epub') return 'epub';
+    if (ext === 'pdf') return 'pdf';
+    return 'text';
+}
+
+function formatLocation(line, fileType) {
+    if (fileType === 'epub') return '챕터 ' + (line + 1);
+    if (fileType === 'pdf') return '페이지 ' + line;
+    return '줄 ' + line;
 }
 
 export async function refreshBookmarks() {
@@ -413,7 +430,8 @@ function createBookmarkItem(bookmark, index, showFile, fileName) {
 
     const location = document.createElement('div');
     location.className = 'bookmark-item-location';
-    location.textContent = '\uC904 ' + (bookmark.line || 0);
+    const fileType = showFile ? guessFileType(fileName) : currentFileType;
+    location.textContent = formatLocation(bookmark.line || 0, fileType);
     content.appendChild(location);
 
     if (showFile && fileName) {

@@ -618,7 +618,7 @@ async function openFile(path) {
             SearchDialog.setFileId(fileInfo.id);
         }
 
-        BookmarkPanel.loadBookmarks(fileInfo.path);
+        BookmarkPanel.loadBookmarks(fileInfo.path, fileInfo.file_type);
 
         // Track file open for file list
         try {
@@ -776,7 +776,7 @@ async function showFileByType(fileInfo, fileId) {
         SearchDialog.setFileId(fileId);
     }
 
-    BookmarkPanel.loadBookmarks(fileInfo.path);
+    BookmarkPanel.loadBookmarks(fileInfo.path, fileInfo.file_type);
     updateViewerUI(fileInfo.file_type);
 }
 
@@ -810,9 +810,13 @@ function handleAddBookmark() {
     const btnCancel = document.getElementById('btn-bookmark-add-cancel');
     const btnClose = document.getElementById('btn-bookmark-add-close');
 
-    infoEl.textContent = isEpub
-        ? '챕터: ' + (currentLine + 1)
-        : '줄: ' + currentLine;
+    if (isEpub) {
+        infoEl.textContent = '챕터 ' + (currentLine + 1) + ' / ' + EpubViewer.getTotalChapters();
+    } else if (isPdf) {
+        infoEl.textContent = '페이지 ' + currentLine + ' / ' + PdfViewer.getTotalPages();
+    } else {
+        infoEl.textContent = '줄 ' + currentLine + ' / ' + Editor.getTotalLines();
+    }
     memoInput.value = '';
     dialogEl.classList.remove('hidden');
     memoInput.focus();
