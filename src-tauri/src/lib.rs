@@ -122,6 +122,8 @@ pub fn run() {
             commands::get_epub_chapters,
             commands::get_epub_chapter,
             commands::get_epub_font_styles,
+            // PDF commands
+            commands::read_pdf_bytes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

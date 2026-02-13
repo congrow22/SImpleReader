@@ -7,6 +7,7 @@ use std::path::PathBuf;
 pub enum FileType {
     Text,
     Epub,
+    Pdf,
 }
 
 pub struct Tab {
@@ -82,6 +83,8 @@ impl TabManager {
 
         if ext == "epub" {
             self.open_epub(path, &file_path, last_position)
+        } else if ext == "pdf" {
+            self.open_pdf(path, &file_path, last_position)
         } else {
             self.open_text(path, &file_path, last_position)
         }
@@ -166,6 +169,42 @@ impl TabManager {
         })
     }
 
+    fn open_pdf(
+        &mut self,
+        path: &str,
+        file_path: &PathBuf,
+        last_position: usize,
+    ) -> anyhow::Result<FileInfo> {
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.to_string());
+
+        let tab = Tab {
+            path: file_path.clone(),
+            buffer: None,
+            epub_book: None,
+            last_position,
+            is_modified: false,
+            file_type: FileType::Pdf,
+        };
+
+        self.tabs.insert(path.to_string(), tab);
+        self.active_tab = Some(path.to_string());
+
+        Ok(FileInfo {
+            id: path.to_string(),
+            name: file_name,
+            path: path.to_string(),
+            total_lines: 0,
+            total_chars: 0,
+            last_position,
+            is_modified: false,
+            file_type: "pdf".to_string(),
+            total_chapters: 0,
+        })
+    }
+
     /// Close a tab. Returns the last_position so caller can persist it.
     pub fn close_tab(&mut self, id: &str) -> anyhow::Result<usize> {
         let tab = self
@@ -225,6 +264,7 @@ impl TabManager {
                     .unwrap_or(0);
                 (0, 0, chapters, "epub".to_string())
             }
+            FileType::Pdf => (0, 0, 0, "pdf".to_string()),
         };
 
         let last_position = tab.last_position;
@@ -264,6 +304,7 @@ impl TabManager {
                 let file_type = match tab.file_type {
                     FileType::Text => "text",
                     FileType::Epub => "epub",
+                    FileType::Pdf => "pdf",
                 };
                 TabInfo {
                     id: id.clone(),
@@ -368,6 +409,15 @@ impl TabManager {
         if let Some(tab) = self.tabs.get_mut(file_id) {
             tab.last_position = position;
         }
+    }
+
+    /// Get the file path for a tab.
+    pub fn get_file_path(&self, file_id: &str) -> anyhow::Result<PathBuf> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        Ok(tab.path.clone())
     }
 
     /// Get EPUB chapter HTML by index.
