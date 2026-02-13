@@ -190,12 +190,12 @@ function initPdfViewer() {
 function initBookmarkPanel() {
     BookmarkPanel.init({
         onBookmarkClick: (position, line) => {
-            if (line > 0) {
-                if (PdfViewer.isVisible()) {
-                    PdfViewer.navigateToPage(line);
-                } else {
-                    Editor.scrollToLine(line);
-                }
+            if (PdfViewer.isVisible()) {
+                if (line > 0) PdfViewer.navigateToPage(line);
+            } else if (EpubViewer.isVisible()) {
+                EpubViewer.navigateToChapter(line, position);
+            } else {
+                if (line > 0) Editor.scrollToLine(line);
             }
         },
         onFileClick: async (filePath) => {
@@ -801,6 +801,8 @@ function handleAddBookmark() {
     const currentLine = isEpub ? EpubViewer.getCurrentChapter()
         : isPdf ? PdfViewer.getCurrentPage()
         : Editor.getCurrentLine();
+    // EPUB: position = 스크롤 위치, line = 챕터 인덱스 / 나머지: position = line
+    const scrollPos = isEpub ? EpubViewer.getScrollPosition() : currentLine;
     const dialogEl = document.getElementById('bookmark-add-dialog');
     const infoEl = document.getElementById('bookmark-add-info');
     const memoInput = document.getElementById('bookmark-memo-input');
@@ -808,7 +810,9 @@ function handleAddBookmark() {
     const btnCancel = document.getElementById('btn-bookmark-add-cancel');
     const btnClose = document.getElementById('btn-bookmark-add-close');
 
-    infoEl.textContent = '\uC904: ' + currentLine;
+    infoEl.textContent = isEpub
+        ? '챕터: ' + (currentLine + 1)
+        : '줄: ' + currentLine;
     memoInput.value = '';
     dialogEl.classList.remove('hidden');
     memoInput.focus();
@@ -820,7 +824,7 @@ function handleAddBookmark() {
 
     function doConfirm() {
         const memo = memoInput.value.trim();
-        BookmarkPanel.addBookmark(currentLine, memo);
+        BookmarkPanel.addBookmark(scrollPos, currentLine, memo);
         doClose();
     }
 

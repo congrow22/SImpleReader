@@ -371,7 +371,8 @@ function getBaseStyles() {
         ' line-height: 1.7;' +
         ' word-wrap: break-word;' +
         ' overflow-wrap: break-word; }\n' +
-        'img { max-width: 100%; height: auto; display: block; margin: 12px auto; }\n' +
+        'img { max-width: 100% !important; height: auto !important; }\n' +
+        'div > img:only-child, .ibc img { display: block; margin: 12px auto; }\n' +
         'h1,h2,h3,h4,h5,h6 { color: ' + textHighlight + '; margin: 1em 0 0.5em; line-height: 1.3; }\n' +
         'p { margin: 0.5em 0; }\n' +
         'a { color: ' + textAccent + '; text-decoration: none; }\n' +
@@ -491,6 +492,31 @@ export function getCurrentChapter() {
 
 export function getTotalChapters() {
     return totalChapters;
+}
+
+export function navigateToChapter(index, scrollPosition) {
+    if (continuousMode) {
+        scrollToChapter(index);
+    } else {
+        goToChapter(index).then(() => {
+            if (scrollPosition > 0 && iframe && iframe.contentWindow) {
+                // iframe 렌더링 완료 후 스크롤 복원
+                setTimeout(() => {
+                    iframe.contentWindow.scrollTo(0, scrollPosition);
+                }, 100);
+            }
+        });
+    }
+}
+
+export function getScrollPosition() {
+    if (continuousMode) {
+        return Math.floor(contentArea.scrollTop || 0);
+    }
+    if (iframe && iframe.contentWindow) {
+        return Math.floor(iframe.contentWindow.scrollY || 0);
+    }
+    return 0;
 }
 
 export function isVisible() {

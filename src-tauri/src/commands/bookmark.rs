@@ -37,13 +37,13 @@ pub async fn remove_file_entry(
 pub async fn add_bookmark(
     file_path: String,
     position: usize,
+    line: usize,
     memo: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
-    // position from frontend is already a line number
     store
-        .add_bookmark(&file_path, position, position, &memo)
+        .add_bookmark(&file_path, position, line, &memo)
         .map_err(|e| e.to_string())
 }
 

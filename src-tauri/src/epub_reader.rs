@@ -484,8 +484,15 @@ fn process_chapter_html(
     image_map: &HashMap<String, String>,
     css_map: &HashMap<String, String>,
 ) -> String {
+    // Step 0: Resolve custom DOCTYPE entities (e.g. &O; &C;)
+    let html_resolved = resolve_doctype_entities(html);
+
+    // Step 0.5: Fix self-closing non-void tags for HTML5 compatibility
+    // XHTML allows <div/> but HTML5 treats it as an unclosed <div>
+    let html_fixed = fix_self_closing_tags(&html_resolved);
+
     // Step 1: Inline linked stylesheets (css_map has NO font data)
-    let html_with_css = inline_linked_stylesheets(html, chapter_path, css_map);
+    let html_with_css = inline_linked_stylesheets(&html_fixed, chapter_path, css_map);
 
     // Step 2: Extract body content
     let body = extract_body_content(&html_with_css);
@@ -507,6 +514,55 @@ fn process_chapter_html(
     } else {
         format!("<style>{}</style>\n{}", processed_styles, processed_body)
     }
+}
+
+/// XHTML의 자기 닫힘 비-void 태그를 HTML5 호환 형태로 변환.
+/// 예: <div style="float:left;"/> → <div style="float:left;"></div>
+/// HTML5에서는 div, span, p 등의 자기 닫힘을 인식하지 않아 후속 콘텐츠가 안에 들어감.
+fn fix_self_closing_tags(html: &str) -> String {
+    let re = regex::Regex::new(
+        r#"(?i)<(div|span|p|section|article|aside|header|footer|nav|main|figure|figcaption|blockquote|pre|ul|ol|li|dl|dt|dd|table|thead|tbody|tfoot|tr|th|td|caption|form|fieldset|label|select|option|textarea|button|details|summary|dialog|a|abbr|b|bdi|bdo|cite|code|data|dfn|em|i|kbd|mark|q|rp|rt|ruby|s|samp|small|strong|sub|sup|time|u|var)\b([^>]*?)\s*/>"#,
+    )
+    .unwrap();
+    re.replace_all(html, |caps: &regex::Captures| {
+        let tag = &caps[1];
+        let attrs = &caps[2];
+        format!("<{}{}></{}>", tag, attrs, tag)
+    })
+    .to_string()
+}
+
+/// DOCTYPE 내부에 정의된 커스텀 XML 엔티티를 본문에 미리 치환.
+/// 예: <!ENTITY O "&#x201C;"> → 본문의 &O; 를 &#x201C; 로 변환
+fn resolve_doctype_entities(html: &str) -> String {
+    let re = regex::Regex::new(r#"<!ENTITY\s+(\w+)\s+["']([^"']+)["']\s*>"#).unwrap();
+    let mut entities: Vec<(String, String)> = Vec::new();
+
+    // DOCTYPE 내부 서브셋 [...] 에서 ENTITY 정의 추출
+    if let Some(dt_start) = html.find("<!DOCTYPE") {
+        if let Some(bracket_start) = html[dt_start..].find('[') {
+            let abs_bracket = dt_start + bracket_start;
+            if let Some(bracket_end) = html[abs_bracket..].find(']') {
+                let subset = &html[abs_bracket..abs_bracket + bracket_end + 1];
+                for caps in re.captures_iter(subset) {
+                    let name = caps[1].to_string();
+                    let value = caps[2].to_string();
+                    entities.push((name, value));
+                }
+            }
+        }
+    }
+
+    if entities.is_empty() {
+        return html.to_string();
+    }
+
+    let mut result = html.to_string();
+    for (name, value) in &entities {
+        let entity_ref = format!("&{};", name);
+        result = result.replace(&entity_ref, value);
+    }
+    result
 }
 
 fn extract_body_content(html: &str) -> String {

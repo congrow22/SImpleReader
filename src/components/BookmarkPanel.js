@@ -315,13 +315,14 @@ async function loadAllBookmarks() {
     }
 }
 
-export async function addBookmark(position, memo) {
+export async function addBookmark(position, line, memo) {
     if (!currentFilePath) return;
 
     try {
         await invoke('add_bookmark', {
             filePath: currentFilePath,
             position: position,
+            line: line,
             memo: memo || ''
         });
         await refreshBookmarks();
