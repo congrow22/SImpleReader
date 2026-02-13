@@ -1638,6 +1638,46 @@ select:focus-visible {
     text-align: center;
 }
 
+.epub-nav-btn.active {
+    background: var(--accent);
+    color: var(--bg-primary);
+    border-color: var(--accent);
+}
+
+.epub-nav-btn.active:hover {
+    opacity: 0.85;
+}
+
+.epub-nav-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+}
+
+.epub-zoom-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 40px;
+    text-align: center;
+    cursor: default;
+    user-select: none;
+}
+
+.epub-chapter-divider {
+    text-align: center;
+    padding: 16px 0 8px;
+    margin: 0;
+    border-top: 2px solid var(--border);
+}
+
+.epub-chapter-divider span {
+    color: var(--text-secondary);
+    font-size: 0.85em;
+}
+
 .epub-content {
     flex: 1;
     overflow: hidden;

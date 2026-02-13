@@ -214,6 +214,25 @@
                                 <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
                             </svg>
                         </button>
+                        <span class="epub-nav-separator"></span>
+                        <button class="epub-nav-btn epub-mode-btn" id="epub-btn-continuous" title="전체 보기 (연속 스크롤)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M5 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H5zm0 1h6v12H5V2z"/>
+                                <path d="M3.5 4a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1zm0 3a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1zm0 3a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1z"/>
+                            </svg>
+                        </button>
+                        <span class="epub-nav-separator"></span>
+                        <button class="epub-nav-btn" id="epub-btn-zoom-out" title="축소 (Ctrl+-)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8z"/>
+                            </svg>
+                        </button>
+                        <span class="epub-zoom-label" id="epub-zoom-label" title="더블클릭으로 초기화">100%</span>
+                        <button class="epub-nav-btn" id="epub-btn-zoom-in" title="확대 (Ctrl++)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                        </button>
                     </div>
                     <div class="epub-content" id="epub-content" tabindex="0"></div>
                 </div>
