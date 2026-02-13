@@ -29,6 +29,10 @@ const ZOOM_STEP = 10;
 // Continuous mode state
 let continuousMode = false;
 let continuousContainer = null;
+let chapterObserver = null;
+let renderedChapters = new Set();
+let pendingScrollRestore = null; // { chapter, offset } - 대상 챕터 로드 후 정확한 스크롤 복원용
+const CHAPTER_ESTIMATED_HEIGHT = 800;
 
 // DOM elements
 const container = document.getElementById('epub-viewer-container');
@@ -237,6 +241,13 @@ async function toggleContinuousMode() {
     btnPrev.style.display = continuousMode ? 'none' : '';
     btnNext.style.display = continuousMode ? 'none' : '';
 
+    // 전환 대상을 미리 숨김 (레이아웃은 유지, 깜빡임 방지)
+    if (continuousMode) {
+        continuousContainer.style.visibility = 'hidden';
+    } else {
+        iframe.style.visibility = 'hidden';
+    }
+
     // Switch display between single iframe and continuous container
     iframe.style.display = continuousMode ? 'none' : 'block';
     continuousContainer.style.display = continuousMode ? 'block' : 'none';
@@ -245,6 +256,7 @@ async function toggleContinuousMode() {
 
     if (continuousMode) {
         await loadAllChapters(savedScrollPos);
+        // loadAllChapters 내부 tryRestoreScroll에서 visibility 복원
     } else {
         await goToChapter(currentChapterIndex);
         // 단일 모드: iframe 로드 후 스크롤 복원
@@ -254,6 +266,14 @@ async function toggleContinuousMode() {
                 if (iframe.contentWindow) {
                     iframe.contentWindow.scrollTo(0, savedScrollPos);
                 }
+                iframe.style.visibility = 'visible';
+            };
+        } else {
+            // 스크롤 복원 불필요 → onload 후 즉시 보이기
+            const origOnload = iframe.onload;
+            iframe.onload = () => {
+                if (origOnload) origOnload();
+                iframe.style.visibility = 'visible';
             };
         }
     }
@@ -266,72 +286,114 @@ async function loadAllChapters(scrollOffset) {
     const extraOffset = scrollOffset || 0;
     chapterLabel.textContent = '전체';
 
-    // Clear previous content
+    // 이전 상태 정리
+    continuousContainer.removeEventListener('scroll', trackChapterOnScroll);
     continuousContainer.innerHTML = '';
+    if (chapterObserver) chapterObserver.disconnect();
+    renderedChapters.clear();
 
-    const baseStyles = getBaseStyles();
-    let loadedCount = 0;
-    let scrollRestored = false;
+    // Phase 1: 모든 챕터의 경량 placeholder 즉시 생성 (~수 ms)
+    for (let i = 0; i < totalChapters; i++) {
+        const title = chapters[i] ? chapters[i].title : ('Chapter ' + (i + 1));
 
-    function tryRestoreScroll() {
-        if (scrollRestored) return;
-        // 챕터 0이더라도 스크롤 오프셋이 있으면 복원
-        if (scrollTarget <= 0 && extraOffset <= 0) return;
+        const divider = document.createElement('div');
+        divider.id = 'epub-ch-' + i;
+        divider.dataset.chapter = i;
+        if (i > 0) {
+            divider.className = 'epub-chapter-divider';
+            divider.innerHTML = '<span>' + escapeHtml(title) + '</span>';
+        }
+        continuousContainer.appendChild(divider);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'epub-chapter-wrapper';
+        wrapper.dataset.chapterIndex = i;
+        wrapper.style.minHeight = CHAPTER_ESTIMATED_HEIGHT + 'px';
+        continuousContainer.appendChild(wrapper);
+    }
+
+    // Phase 2: 대상 챕터 위치로 근사 스크롤 후 즉시 표시
+    // extraOffset은 실제 콘텐츠 기준이므로 placeholder에선 정확하지 않음
+    // → 챕터 시작 위치까지만 스크롤하고, 정확한 오프셋은 챕터 로드 후 복원
+    pendingScrollRestore = (extraOffset > 0) ? { chapter: scrollTarget, offset: extraOffset } : null;
+    if (scrollTarget > 0 || extraOffset > 0) {
         const marker = continuousContainer.querySelector('#epub-ch-' + scrollTarget);
         if (marker) {
-            continuousContainer.scrollTop = marker.offsetTop + extraOffset;
-            scrollRestored = true;
+            continuousContainer.scrollTop = marker.offsetTop;
         }
     }
+    continuousContainer.style.visibility = 'visible';
 
-    for (let i = 0; i < totalChapters; i++) {
-        try {
-            const html = await invoke('get_epub_chapter', {
-                fileId: currentFileId,
-                chapterIndex: i
-            });
-            const title = chapters[i] ? chapters[i].title : ('Chapter ' + (i + 1));
+    // Phase 3: IntersectionObserver로 뷰포트 근처 챕터만 렌더링
+    chapterObserver = new IntersectionObserver(handleChapterIntersect, {
+        root: continuousContainer,
+        rootMargin: '500px 0px',
+    });
+    continuousContainer.querySelectorAll('.epub-chapter-wrapper').forEach(w => {
+        chapterObserver.observe(w);
+    });
 
-            // Chapter divider (outside iframe, in the scroll container)
-            const divider = document.createElement('div');
-            divider.id = 'epub-ch-' + i;
-            divider.dataset.chapter = i;
-            if (i > 0) {
-                divider.className = 'epub-chapter-divider';
-                divider.innerHTML = '<span>' + escapeHtml(title) + '</span>';
-            }
-            continuousContainer.appendChild(divider);
-
-            // Per-chapter iframe (identical to single chapter rendering)
-            const chIframe = document.createElement('iframe');
-            chIframe.className = 'epub-chapter-frame';
-            chIframe.style.cssText = 'width:100%;border:none;display:block;overflow:hidden;';
-            continuousContainer.appendChild(chIframe);
-
-            const srcdoc = buildSrcdoc(baseStyles, sanitizeHtml(html));
-            chIframe.srcdoc = srcdoc;
-
-            chIframe.onload = () => {
-                setupIframeContent(chIframe);
-                resizeIframeToContent(chIframe);
-                loadedCount++;
-                // 대상 챕터까지 로드 완료되면 스크롤 복원
-                if (loadedCount > scrollTarget) {
-                    tryRestoreScroll();
-                }
-            };
-        } catch {
-            // skip failed chapters
-        }
-    }
-
-    // Track which chapter is visible while scrolling
+    // 스크롤 시 현재 챕터 추적
     continuousContainer.addEventListener('scroll', trackChapterOnScroll);
+}
 
-    // 폴백: 300ms 후에도 스크롤 안 됐으면 재시도
-    if (scrollTarget > 0) {
-        setTimeout(tryRestoreScroll, 300);
-        setTimeout(tryRestoreScroll, 600);
+function handleChapterIntersect(entries) {
+    for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const index = parseInt(entry.target.dataset.chapterIndex, 10);
+        if (renderedChapters.has(index)) continue;
+        renderedChapters.add(index);
+        renderLazyChapter(entry.target, index);
+    }
+}
+
+async function renderLazyChapter(wrapper, index) {
+    try {
+        const html = await invoke('get_epub_chapter', { fileId: currentFileId, chapterIndex: index });
+        const baseStyles = getBaseStyles();
+
+        const chIframe = document.createElement('iframe');
+        chIframe.className = 'epub-chapter-frame';
+        chIframe.style.cssText = 'width:100%;border:none;display:block;overflow:hidden;';
+        wrapper.appendChild(chIframe);
+
+        const srcdoc = buildSrcdoc(baseStyles, sanitizeHtml(html));
+        chIframe.srcdoc = srcdoc;
+
+        chIframe.onload = () => {
+            setupIframeContent(chIframe);
+
+            // 뷰포트 위 챕터의 높이 변경 시 스크롤 보정
+            const oldH = wrapper.offsetHeight;
+            const aboveViewport = wrapper.offsetTop + oldH < continuousContainer.scrollTop;
+
+            resizeIframeToContent(chIframe);
+            wrapper.style.minHeight = '0';
+
+            if (aboveViewport) {
+                const diff = wrapper.offsetHeight - oldH;
+                if (diff !== 0) {
+                    continuousContainer.scrollTop += diff;
+                }
+            }
+
+            // 현재 줌 레벨 적용
+            if (zoomLevel !== 100 && chIframe.contentDocument && chIframe.contentDocument.body) {
+                chIframe.contentDocument.body.style.zoom = (zoomLevel / 100).toString();
+                resizeIframeToContent(chIframe);
+            }
+
+            // 대상 챕터 로드 완료 후 정확한 스크롤 오프셋 복원
+            if (pendingScrollRestore && index === pendingScrollRestore.chapter) {
+                const marker = continuousContainer.querySelector('#epub-ch-' + index);
+                if (marker) {
+                    continuousContainer.scrollTop = marker.offsetTop + pendingScrollRestore.offset;
+                }
+                pendingScrollRestore = null;
+            }
+        };
+    } catch {
+        wrapper.style.minHeight = '0';
     }
 }
 
@@ -342,6 +404,12 @@ function scrollToChapter(index) {
         marker.scrollIntoView({ behavior: 'smooth' });
         currentChapterIndex = index;
         chapterSelect.value = index;
+    }
+    // 대상 챕터가 아직 로드 안 됐으면 즉시 로드
+    const wrapper = continuousContainer.querySelector('[data-chapter-index="' + index + '"]');
+    if (wrapper && !renderedChapters.has(index)) {
+        renderedChapters.add(index);
+        renderLazyChapter(wrapper, index);
     }
 }
 
@@ -500,6 +568,8 @@ export function hide() {
 }
 
 export function clear() {
+    if (chapterObserver) { chapterObserver.disconnect(); chapterObserver = null; }
+    renderedChapters.clear();
     currentFileId = null;
     currentFilePath = null;
     chapters = [];
@@ -539,7 +609,15 @@ export function navigateToChapter(index, scrollPosition) {
             currentChapterIndex = index;
             chapterSelect.value = index;
         }
+        // 대상 챕터가 아직 로드 안 됐으면 즉시 로드
+        const wrapper = continuousContainer.querySelector('[data-chapter-index="' + index + '"]');
+        if (wrapper && !renderedChapters.has(index)) {
+            renderedChapters.add(index);
+            renderLazyChapter(wrapper, index);
+        }
     } else {
+        // 스크롤 복원 필요 시 깜빡임 방지
+        if (scrollPosition > 0) iframe.style.visibility = 'hidden';
         goToChapter(index).then(() => {
             if (scrollPosition > 0 && iframe) {
                 // goToChapter의 onload가 scrollTop=0으로 초기화하므로
@@ -549,6 +627,7 @@ export function navigateToChapter(index, scrollPosition) {
                     if (iframe.contentWindow) {
                         iframe.contentWindow.scrollTo(0, scrollPosition);
                     }
+                    iframe.style.visibility = 'visible';
                 };
             }
         });
