@@ -69,6 +69,55 @@ pub fn unregister_context_menu() -> Result<bool, String> {
     }
 }
 
+/// Get system font family names from Windows Registry
+#[command]
+pub fn get_system_fonts() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::collections::BTreeSet;
+
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let fonts_key = hklm
+            .open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
+            .map_err(|e| format!("Failed to open fonts registry: {}", e))?;
+
+        let mut font_names = BTreeSet::new();
+
+        for (name, _value) in fonts_key.enum_values().filter_map(|r| r.ok()) {
+            // Registry entries look like "Arial (TrueType)" or "Arial Bold (TrueType)"
+            // Extract the font family name before the parentheses
+            if let Some(paren_pos) = name.rfind('(') {
+                let family = name[..paren_pos].trim();
+                // Skip variants like "Bold", "Italic", "Light" etc.
+                // Keep only base family names
+                let base = family
+                    .trim_end_matches(" Bold")
+                    .trim_end_matches(" Italic")
+                    .trim_end_matches(" Bold Italic")
+                    .trim_end_matches(" Light")
+                    .trim_end_matches(" Medium")
+                    .trim_end_matches(" Thin")
+                    .trim_end_matches(" SemiBold")
+                    .trim_end_matches(" ExtraBold")
+                    .trim_end_matches(" ExtraLight")
+                    .trim_end_matches(" Black")
+                    .trim_end_matches(" Regular")
+                    .trim();
+                if !base.is_empty() {
+                    font_names.insert(base.to_string());
+                }
+            }
+        }
+
+        Ok(font_names.into_iter().collect())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(vec!["monospace".to_string()])
+    }
+}
+
 /// Check if context menu is registered
 #[command]
 pub fn is_context_menu_registered() -> Result<bool, String> {

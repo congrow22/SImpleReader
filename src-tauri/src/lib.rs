@@ -115,6 +115,8 @@ pub fn run() {
             commands::register_context_menu,
             commands::unregister_context_menu,
             commands::is_context_menu_registered,
+            // Font commands
+            commands::get_system_fonts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 let currentConfig = null;
 let onApply = null;
+let fontsLoaded = false;
 
 // DOM
 const dialog = document.getElementById('settings-dialog');
@@ -27,6 +28,11 @@ export function init(options = {}) {
         fontSizeValue.textContent = fontSize.value;
     });
 
+    fontFamily.addEventListener('change', () => {
+        const selected = fontFamily.options[fontFamily.selectedIndex];
+        fontFamily.title = selected ? selected.textContent : '';
+    });
+
     btnApply.addEventListener('click', applySettings);
     btnCancel.addEventListener('click', hide);
     btnClose.addEventListener('click', hide);
@@ -40,7 +46,36 @@ export function init(options = {}) {
     });
 }
 
+async function loadSystemFonts() {
+    if (fontsLoaded) return;
+    try {
+        const fonts = await invoke('get_system_fonts');
+        while (fontFamily.firstChild) {
+            fontFamily.removeChild(fontFamily.firstChild);
+        }
+
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = 'monospace';
+        defaultOpt.textContent = '시스템 모노스페이스';
+        fontFamily.appendChild(defaultOpt);
+
+        for (const name of fonts) {
+            const opt = document.createElement('option');
+            opt.value = "'" + name + "'";
+            opt.textContent = name;
+            opt.title = name;
+            opt.style.fontFamily = "'" + name + "'";
+            fontFamily.appendChild(opt);
+        }
+        fontsLoaded = true;
+    } catch (err) {
+        console.error('Failed to load system fonts:', err);
+    }
+}
+
 export async function show() {
+    await loadSystemFonts();
+
     try {
         currentConfig = await invoke('get_config');
     } catch (err) {
@@ -66,6 +101,8 @@ export async function show() {
             fontFamily.selectedIndex = 0;
         }
     }
+    const selectedOpt = fontFamily.options[fontFamily.selectedIndex];
+    fontFamily.title = selectedOpt ? selectedOpt.textContent : '';
 
     fontSize.value = currentConfig.font_size || 16;
     fontSizeValue.textContent = fontSize.value;
