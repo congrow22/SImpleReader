@@ -8,14 +8,14 @@ pub async fn open_file(
     state: tauri::State<'_, AppState>,
 ) -> Result<FileInfo, String> {
     // Get last position from bookmark store
-    let last_position = {
+    let (last_position, last_scroll_offset) = {
         let store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
-        store.get_last_position(&path).unwrap_or(0)
+        store.get_last_position(&path).unwrap_or((0, 0))
     };
 
     let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
     tab_manager
-        .open_file(&path, last_position)
+        .open_file(&path, last_position, last_scroll_offset)
         .map_err(|e| e.to_string())
 }
 
@@ -24,7 +24,7 @@ pub async fn close_file(
     file_id: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let last_position = {
+    let (last_position, last_scroll_offset) = {
         let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
         tab_manager.close_tab(&file_id).map_err(|e| e.to_string())?
     };
@@ -32,7 +32,7 @@ pub async fn close_file(
     // Save last position to bookmark store
     let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
     store
-        .save_last_position(&file_id, last_position)
+        .save_last_position(&file_id, last_position, last_scroll_offset)
         .map_err(|e| e.to_string())?;
 
     Ok(())
@@ -75,7 +75,14 @@ pub async fn switch_tab(
     file_id: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<FileInfo, String> {
+    // bookmark store에서 최신 last_position을 읽어서 탭에 반영
+    let (last_position, last_scroll_offset) = {
+        let store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+        store.get_last_position(&file_id).unwrap_or((0, 0))
+    };
+
     let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
+    tab_manager.set_last_position(&file_id, last_position, last_scroll_offset);
     tab_manager
         .switch_tab(&file_id)
         .map_err(|e| e.to_string())

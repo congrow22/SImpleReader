@@ -15,6 +15,7 @@ pub struct Tab {
     pub buffer: Option<TextBuffer>,
     pub epub_book: Option<EpubBook>,
     pub last_position: usize,
+    pub last_scroll_offset: usize,
     pub is_modified: bool,
     pub file_type: FileType,
 }
@@ -27,6 +28,7 @@ pub struct FileInfo {
     pub total_lines: usize,
     pub total_chars: usize,
     pub last_position: usize,
+    pub last_scroll_offset: usize,
     pub is_modified: bool,
     pub file_type: String,
     pub total_chapters: usize,
@@ -65,9 +67,10 @@ impl TabManager {
 
     /// Open a file in a new tab (or switch to it if already open).
     /// Returns FileInfo about the opened file.
-    pub fn open_file(&mut self, path: &str, last_position: usize) -> anyhow::Result<FileInfo> {
-        // If already open, just switch to it
+    pub fn open_file(&mut self, path: &str, last_position: usize, last_scroll_offset: usize) -> anyhow::Result<FileInfo> {
+        // If already open, update last_position and switch to it
         if self.tabs.contains_key(path) {
+            self.set_last_position(path, last_position, last_scroll_offset);
             return self.switch_tab(path);
         }
 
@@ -82,11 +85,11 @@ impl TabManager {
             .unwrap_or_default();
 
         if ext == "epub" {
-            self.open_epub(path, &file_path, last_position)
+            self.open_epub(path, &file_path, last_position, last_scroll_offset)
         } else if ext == "pdf" {
-            self.open_pdf(path, &file_path, last_position)
+            self.open_pdf(path, &file_path, last_position, last_scroll_offset)
         } else {
-            self.open_text(path, &file_path, last_position)
+            self.open_text(path, &file_path, last_position, last_scroll_offset)
         }
     }
 
@@ -95,6 +98,7 @@ impl TabManager {
         path: &str,
         file_path: &PathBuf,
         last_position: usize,
+        last_scroll_offset: usize,
     ) -> anyhow::Result<FileInfo> {
         let buffer = TextBuffer::from_file(file_path)?;
         let total_lines = buffer.get_total_lines();
@@ -105,6 +109,7 @@ impl TabManager {
             buffer: Some(buffer),
             epub_book: None,
             last_position,
+            last_scroll_offset,
             is_modified: false,
             file_type: FileType::Text,
         };
@@ -124,6 +129,7 @@ impl TabManager {
             total_lines,
             total_chars,
             last_position,
+            last_scroll_offset,
             is_modified: false,
             file_type: "text".to_string(),
             total_chapters: 0,
@@ -135,6 +141,7 @@ impl TabManager {
         path: &str,
         file_path: &PathBuf,
         last_position: usize,
+        last_scroll_offset: usize,
     ) -> anyhow::Result<FileInfo> {
         let epub_book = crate::epub_reader::parse_epub(file_path)?;
         let total_chapters = epub_book.total_chapters();
@@ -149,6 +156,7 @@ impl TabManager {
             buffer: None,
             epub_book: Some(epub_book),
             last_position,
+            last_scroll_offset,
             is_modified: false,
             file_type: FileType::Epub,
         };
@@ -163,6 +171,7 @@ impl TabManager {
             total_lines: 0,
             total_chars: 0,
             last_position,
+            last_scroll_offset,
             is_modified: false,
             file_type: "epub".to_string(),
             total_chapters,
@@ -174,6 +183,7 @@ impl TabManager {
         path: &str,
         file_path: &PathBuf,
         last_position: usize,
+        last_scroll_offset: usize,
     ) -> anyhow::Result<FileInfo> {
         let file_name = file_path
             .file_name()
@@ -185,6 +195,7 @@ impl TabManager {
             buffer: None,
             epub_book: None,
             last_position,
+            last_scroll_offset,
             is_modified: false,
             file_type: FileType::Pdf,
         };
@@ -199,27 +210,29 @@ impl TabManager {
             total_lines: 0,
             total_chars: 0,
             last_position,
+            last_scroll_offset,
             is_modified: false,
             file_type: "pdf".to_string(),
             total_chapters: 0,
         })
     }
 
-    /// Close a tab. Returns the last_position so caller can persist it.
-    pub fn close_tab(&mut self, id: &str) -> anyhow::Result<usize> {
+    /// Close a tab. Returns (last_position, last_scroll_offset) so caller can persist it.
+    pub fn close_tab(&mut self, id: &str) -> anyhow::Result<(usize, usize)> {
         let tab = self
             .tabs
             .remove(id)
             .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", id))?;
 
         let last_position = tab.last_position;
+        let last_scroll_offset = tab.last_scroll_offset;
 
         // If we closed the active tab, pick another one
         if self.active_tab.as_deref() == Some(id) {
             self.active_tab = self.tabs.keys().next().cloned();
         }
 
-        Ok(last_position)
+        Ok((last_position, last_scroll_offset))
     }
 
     /// Switch to an existing tab, lazy-loading the rope if it was unloaded.
@@ -268,6 +281,7 @@ impl TabManager {
         };
 
         let last_position = tab.last_position;
+        let last_scroll_offset = tab.last_scroll_offset;
         let is_modified = tab.is_modified;
         let path_str = tab.path.to_string_lossy().to_string();
         let name = tab
@@ -285,6 +299,7 @@ impl TabManager {
             total_lines,
             total_chars,
             last_position,
+            last_scroll_offset,
             is_modified,
             file_type: file_type_str,
             total_chapters,
@@ -405,9 +420,10 @@ impl TabManager {
     }
 
     /// Update the last reading position for a tab.
-    pub fn set_last_position(&mut self, file_id: &str, position: usize) {
+    pub fn set_last_position(&mut self, file_id: &str, position: usize, scroll_offset: usize) {
         if let Some(tab) = self.tabs.get_mut(file_id) {
             tab.last_position = position;
+            tab.last_scroll_offset = scroll_offset;
         }
     }
 

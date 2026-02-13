@@ -17,6 +17,8 @@ pub struct FileBookmarks {
     pub bookmarks: Vec<Bookmark>,
     #[serde(default)]
     pub favorite: bool,
+    #[serde(default)]
+    pub last_scroll_offset: usize,
 }
 
 impl Default for FileBookmarks {
@@ -26,6 +28,7 @@ impl Default for FileBookmarks {
             last_opened: chrono::Local::now().to_rfc3339(),
             bookmarks: Vec::new(),
             favorite: false,
+            last_scroll_offset: 0,
         }
     }
 }
@@ -159,9 +162,10 @@ impl BookmarkStore {
     }
 
     /// Save the last reading position for a file (only if already tracked).
-    pub fn save_last_position(&mut self, file_path: &str, position: usize) -> anyhow::Result<()> {
+    pub fn save_last_position(&mut self, file_path: &str, position: usize, scroll_offset: usize) -> anyhow::Result<()> {
         if let Some(entry) = self.data.get_mut(file_path) {
             entry.last_position = position;
+            entry.last_scroll_offset = scroll_offset;
             entry.last_opened = chrono::Local::now().to_rfc3339();
             self.save_to_disk()?;
         }
@@ -169,8 +173,8 @@ impl BookmarkStore {
     }
 
     /// Get the last reading position for a file.
-    pub fn get_last_position(&self, file_path: &str) -> Option<usize> {
-        self.data.get(file_path).map(|entry| entry.last_position)
+    pub fn get_last_position(&self, file_path: &str) -> Option<(usize, usize)> {
+        self.data.get(file_path).map(|entry| (entry.last_position, entry.last_scroll_offset))
     }
 
     /// Track a file being opened (creates entry if not exists, updates last_opened).

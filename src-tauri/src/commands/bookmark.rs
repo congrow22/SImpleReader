@@ -100,10 +100,11 @@ pub async fn toggle_favorite(
 pub async fn save_last_position(
     file_path: String,
     position: usize,
+    scroll_offset: Option<usize>,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
     store
-        .save_last_position(&file_path, position)
+        .save_last_position(&file_path, position, scroll_offset.unwrap_or(0))
         .map_err(|e| e.to_string())
 }

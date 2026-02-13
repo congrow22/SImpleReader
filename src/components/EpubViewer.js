@@ -181,10 +181,17 @@ export async function loadFile(fileInfo) {
 
     show();
 
+    const savedScrollOffset = fileInfo.last_scroll_offset || 0;
+
     if (continuousMode) {
-        await loadAllChapters();
+        await loadAllChapters(savedScrollOffset);
     } else {
-        await goToChapter(currentChapterIndex);
+        if (savedScrollOffset > 0) {
+            // 챕터 로딩 후 스크롤 오프셋 복원 (책갈피와 동일한 방식)
+            navigateToChapter(currentChapterIndex, savedScrollOffset);
+        } else {
+            await goToChapter(currentChapterIndex);
+        }
     }
 }
 

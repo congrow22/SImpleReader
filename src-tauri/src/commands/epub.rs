@@ -20,7 +20,7 @@ pub async fn get_epub_chapter(
     state: tauri::State<'_, AppState>,
 ) -> Result<String, String> {
     let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
-    tab_manager.set_last_position(&file_id, chapter_index);
+    tab_manager.set_last_position(&file_id, chapter_index, 0);
     tab_manager
         .get_epub_chapter_html(&file_id, chapter_index)
         .map_err(|e| e.to_string())

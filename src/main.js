@@ -589,8 +589,47 @@ async function handleOpenFile() {
     }
 }
 
+async function saveCurrentPosition() {
+    if (PdfViewer.isVisible()) {
+        const filePath = PdfViewer.getCurrentFilePath();
+        if (filePath) {
+            try {
+                await invoke('save_last_position', {
+                    filePath: filePath,
+                    position: PdfViewer.getCurrentPage()
+                });
+            } catch { /* non-critical */ }
+        }
+    } else if (EpubViewer.isVisible()) {
+        const filePath = EpubViewer.getCurrentFilePath();
+        if (filePath) {
+            try {
+                await invoke('save_last_position', {
+                    filePath: filePath,
+                    position: EpubViewer.getCurrentChapter(),
+                    scrollOffset: EpubViewer.getScrollPosition()
+                });
+            } catch { /* non-critical */ }
+        }
+    } else {
+        const filePath = Editor.getCurrentFilePath();
+        const line = Editor.getCurrentLine();
+        if (filePath && line > 0) {
+            try {
+                await invoke('save_last_position', {
+                    filePath: filePath,
+                    position: line
+                });
+            } catch { /* non-critical */ }
+        }
+    }
+}
+
 async function openFile(path) {
     try {
+        // 이전 파일 위치 저장
+        await saveCurrentPosition();
+
         const fileInfo = await invoke('open_file', { path: path });
 
         state.files.set(fileInfo.id, fileInfo);
@@ -703,41 +742,10 @@ async function handleTabSwitch(fileId) {
         return;
     }
 
-    state.activeFileId = fileId;
+    // 이전 파일 위치 저장
+    await saveCurrentPosition();
 
-    // Save last position for previous file
-    if (PdfViewer.isVisible()) {
-        const prevFilePath = PdfViewer.getCurrentFilePath();
-        if (prevFilePath) {
-            try {
-                await invoke('save_last_position', {
-                    filePath: prevFilePath,
-                    position: PdfViewer.getCurrentPage()
-                });
-            } catch { /* non-critical */ }
-        }
-    } else if (EpubViewer.isVisible()) {
-        const prevFilePath = EpubViewer.getCurrentFilePath();
-        if (prevFilePath) {
-            try {
-                await invoke('save_last_position', {
-                    filePath: prevFilePath,
-                    position: EpubViewer.getCurrentChapter()
-                });
-            } catch { /* non-critical */ }
-        }
-    } else {
-        const prevFilePath = Editor.getCurrentFilePath();
-        const prevLine = Editor.getCurrentLine();
-        if (prevFilePath && prevLine > 0) {
-            try {
-                await invoke('save_last_position', {
-                    filePath: prevFilePath,
-                    position: prevLine
-                });
-            } catch { /* non-critical */ }
-        }
-    }
+    state.activeFileId = fileId;
 
     // Switch in backend
     try {
@@ -745,6 +753,12 @@ async function handleTabSwitch(fileId) {
         if (fileInfo) {
             state.files.set(fileId, fileInfo);
             await showFileByType(fileInfo, fileId);
+
+            // 파일 목록 순서 갱신
+            try {
+                await invoke('track_file_open', { filePath: fileInfo.path });
+                BookmarkPanel.refreshFileList();
+            } catch { /* non-critical */ }
         }
     } catch {
         const cachedInfo = state.files.get(fileId);
