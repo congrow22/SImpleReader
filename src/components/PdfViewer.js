@@ -31,6 +31,10 @@ let continuousContainer = null;
 // Rendering lock (prevent concurrent renders)
 let rendering = false;
 
+// Lazy rendering state
+let pageObserver = null;
+let renderedPages = new Set();
+
 // DOM elements
 const container = document.getElementById('pdf-viewer-container');
 const pageInput = document.getElementById('pdf-page-input');
@@ -42,6 +46,7 @@ const btnZoomIn = document.getElementById('pdf-btn-zoom-in');
 const btnZoomOut = document.getElementById('pdf-btn-zoom-out');
 const zoomLabel = document.getElementById('pdf-zoom-label');
 const btnContinuous = document.getElementById('pdf-btn-continuous');
+const loadingOverlay = document.getElementById('pdf-loading-overlay');
 
 // Single page canvas
 let singleCanvas = null;
@@ -250,7 +255,14 @@ async function renderAllPages(targetPage) {
 
     const scrollTarget = targetPage || currentPage;
 
+    // 로딩 오버레이 표시
+    showLoading();
+
     pageLabel.textContent = '/ ' + totalPages;
+
+    // Observer 정리
+    if (pageObserver) pageObserver.disconnect();
+    renderedPages.clear();
 
     // scroll 리스너 제거 후 컨텐츠 초기화 (currentPage 오염 방지)
     continuousContainer.removeEventListener('scroll', trackPageOnScroll);
@@ -258,34 +270,25 @@ async function renderAllPages(targetPage) {
 
     const scale = zoomLevel / 100;
 
-    // 1단계: 모든 페이지 메타데이터를 병렬로 가져옴 (빠름)
-    const pages = await Promise.all(
-        Array.from({ length: totalPages }, (_, i) =>
-            pdfDoc.getPage(i + 1).catch(() => null)
-        )
-    );
+    // 1단계: 첫 페이지에서 기준 크기 확보 (1회만)
+    const firstPage = await pdfDoc.getPage(1);
+    const refViewport = firstPage.getViewport({ scale: scale * window.devicePixelRatio });
 
-    // 2단계: wrapper + canvas 크기만 설정 (렌더링 없이 레이아웃 확보)
-    const renderQueue = [];
+    // 2단계: 모든 wrapper+canvas를 기준 크기로 즉시 생성 (async 불필요)
     for (let i = 0; i < totalPages; i++) {
-        const page = pages[i];
         const wrapper = document.createElement('div');
         wrapper.className = 'pdf-page-wrapper';
         wrapper.dataset.page = i + 1;
 
         const canvas = document.createElement('canvas');
         canvas.className = 'pdf-canvas';
+        canvas.width = refViewport.width;
+        canvas.height = refViewport.height;
+        canvas.style.width = (refViewport.width / window.devicePixelRatio) + 'px';
+        canvas.style.height = (refViewport.height / window.devicePixelRatio) + 'px';
+
         wrapper.appendChild(canvas);
         continuousContainer.appendChild(wrapper);
-
-        if (page) {
-            const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-            canvas.style.width = (viewport.width / window.devicePixelRatio) + 'px';
-            canvas.style.height = (viewport.height / window.devicePixelRatio) + 'px';
-            renderQueue.push({ canvas, page, viewport });
-        }
     }
 
     // 3단계: 레이아웃 완료 → 대상 페이지로 즉시 스크롤
@@ -302,19 +305,50 @@ async function renderAllPages(targetPage) {
         onPageChange(currentPage, totalPages);
     }
 
-    // 4단계: 스크롤 리스너 등록 (위치 설정 완료 후)
+    // 4단계: 로딩 숨기고 스크롤 리스너 등록
+    hideLoading();
     continuousContainer.addEventListener('scroll', trackPageOnScroll);
 
-    // 5단계: 캔버스 실제 렌더링 (느림 - 빈 캔버스가 점진적으로 채워짐)
-    for (const entry of renderQueue) {
-        try {
-            const ctx = entry.canvas.getContext('2d');
-            await entry.page.render({ canvasContext: ctx, viewport: entry.viewport }).promise;
-        } catch {
-            // skip failed pages
-        }
+    // 5단계: IntersectionObserver로 보이는 페이지만 렌더링
+    pageObserver = new IntersectionObserver(handlePageIntersect, {
+        root: continuousContainer,
+        rootMargin: '200px 0px',
+    });
+    const wrappers = continuousContainer.querySelectorAll('[data-page]');
+    wrappers.forEach(w => pageObserver.observe(w));
+}
+
+function handlePageIntersect(entries) {
+    for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const pageNum = parseInt(entry.target.dataset.page, 10);
+        if (renderedPages.has(pageNum)) continue;
+        renderedPages.add(pageNum);
+        renderLazyPage(entry.target, pageNum);
     }
 }
+
+async function renderLazyPage(wrapper, pageNum) {
+    try {
+        const page = await pdfDoc.getPage(pageNum);
+        const scale = zoomLevel / 100;
+        const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+        const canvas = wrapper.querySelector('canvas');
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = (viewport.width / window.devicePixelRatio) + 'px';
+        canvas.style.height = (viewport.height / window.devicePixelRatio) + 'px';
+
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+    } catch {
+        // skip failed pages
+    }
+}
+
+function showLoading() { loadingOverlay.classList.remove('hidden'); }
+function hideLoading() { loadingOverlay.classList.add('hidden'); }
 
 function scrollToPage(num) {
     if (!continuousContainer || num < 1 || num > totalPages) return;
@@ -364,6 +398,8 @@ export function hide() {
 }
 
 export function clear() {
+    if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
+    renderedPages.clear();
     currentFileId = null;
     currentFilePath = null;
     pdfDoc = null;

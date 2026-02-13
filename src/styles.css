@@ -1695,6 +1695,7 @@ select:focus-visible {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
 }
 
 .pdf-nav-bar {
@@ -1762,6 +1763,29 @@ select:focus-visible {
 
 .pdf-page-wrapper:first-child {
     padding-top: 12px;
+}
+
+.pdf-loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    z-index: 10;
+}
+
+.pdf-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: pdf-spin 0.8s linear infinite;
+}
+
+@keyframes pdf-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* ========================================
