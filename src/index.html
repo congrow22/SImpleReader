@@ -180,7 +180,7 @@
                     </div>
                 </div>
 
-                <!-- Editor Container -->
+                <!-- Editor Container (Text files) -->
                 <div id="editor-container" class="editor-container">
                     <div class="editor-welcome" id="editor-welcome">
                         <div class="welcome-content">
@@ -197,6 +197,25 @@
                         <div class="editor-lines" id="editor-lines"></div>
                         <div class="editor-spacer-bottom" id="editor-spacer-bottom"></div>
                     </div>
+                </div>
+
+                <!-- EPUB Viewer Container -->
+                <div id="epub-viewer-container" class="epub-viewer-container hidden">
+                    <div class="epub-nav-bar" id="epub-nav-bar">
+                        <button class="epub-nav-btn" id="epub-btn-prev" title="이전 챕터" disabled>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                            </svg>
+                        </button>
+                        <select class="epub-chapter-select" id="epub-chapter-select" title="챕터 선택"></select>
+                        <span class="epub-chapter-label" id="epub-chapter-label">0 / 0</span>
+                        <button class="epub-nav-btn" id="epub-btn-next" title="다음 챕터" disabled>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="epub-content" id="epub-content" tabindex="0"></div>
                 </div>
             </div>
         </div>

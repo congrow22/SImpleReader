@@ -27,6 +27,16 @@ impl TextBuffer {
         })
     }
 
+    /// Create a TextBuffer from a string (used for EPUB text content).
+    pub fn from_string(text: &str) -> Self {
+        Self {
+            rope: Rope::from_str(text),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            is_modified: false,
+        }
+    }
+
     /// Create an empty TextBuffer.
     pub fn new() -> Self {
         Self {

@@ -77,8 +77,7 @@ async function selectFormat(formatType) {
 
         preview.classList.remove('hidden');
         btnApply.classList.remove('hidden');
-    } catch (err) {
-        console.error('Preview failed:', err);
+    } catch {
         previewContent.textContent = '\uBBF8\uB9AC\uBCF4\uAE30\uB97C \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.';
         preview.classList.remove('hidden');
         btnApply.classList.add('hidden');
@@ -96,8 +95,8 @@ async function applyFormat() {
 
         if (onFormatApplied) onFormatApplied();
         hide();
-    } catch (err) {
-        console.error('Format apply failed:', err);
+    } catch {
+        // 포맷 적용 실패
     }
 }
 

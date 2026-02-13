@@ -68,8 +68,8 @@ async function loadSystemFonts() {
             fontFamily.appendChild(opt);
         }
         fontsLoaded = true;
-    } catch (err) {
-        console.error('Failed to load system fonts:', err);
+    } catch {
+        // 시스템 폰트 로드 실패
     }
 }
 
@@ -78,8 +78,7 @@ export async function show() {
 
     try {
         currentConfig = await invoke('get_config');
-    } catch (err) {
-        console.error('Failed to load config:', err);
+    } catch {
         currentConfig = {
             font_family: "'Consolas', monospace",
             font_size: 16,
@@ -146,8 +145,8 @@ async function applySettings() {
             } else if (!contextMenu.checked && isRegistered) {
                 await invoke('unregister_context_menu');
             }
-        } catch (e) {
-            console.error('Failed to update context menu:', e);
+        } catch {
+            // 컨텍스트 메뉴 업데이트 실패
         }
 
         if (onApply) {
@@ -155,8 +154,8 @@ async function applySettings() {
         }
 
         hide();
-    } catch (err) {
-        console.error('Failed to save config:', err);
+    } catch {
+        // 설정 저장 실패
     }
 }
 

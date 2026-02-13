@@ -217,8 +217,8 @@ async function renderVisibleLines(force = false) {
 
         renderedStartLine = startLine;
         renderedEndLine = endLine;
-    } catch (err) {
-        console.error('Failed to render lines:', err);
+    } catch {
+        // 렌더링 실패
     }
 }
 
@@ -242,8 +242,7 @@ async function getChunk(startLine, endLine) {
         cachedChunks.set(cacheKey, chunk);
 
         return chunk;
-    } catch (err) {
-        console.error('Failed to get chunk:', err);
+    } catch {
         return null;
     }
 }
@@ -373,8 +372,7 @@ function startLineEdit(contentEl, lineIndex, originalText) {
                 cachedChunks.clear();
                 if (onModified) onModified(currentFileId);
                 scheduleRender();
-            } catch (err) {
-                console.error('Edit failed:', err);
+            } catch {
                 contentEl.textContent = originalText;
             }
         }
@@ -406,7 +404,6 @@ export function setActiveMatch(index) {
     activeMatchIndex = index;
     if (index >= 0 && index < searchMatches.length) {
         const match = searchMatches[index];
-        console.log('[Search Nav] index=' + index + ' line=' + match.line + ' -> scrollToLine(' + (match.line + 1) + ') totalLines=' + totalLines);
         scrollToLine(match.line + 1);
     }
     cachedChunks.clear();
@@ -427,7 +424,6 @@ export function scrollToLine(lineNumber) {
     const viewportHeight = scrollArea.clientHeight;
     const newScrollTop = targetScroll - (viewportHeight / 2) + (lineHeight / 2);
     scrollArea.scrollTop = newScrollTop;
-    console.log('[scrollToLine] line=' + lineNumber + ' lineHeight=' + lineHeight + ' ratio=' + ratio + ' target=' + newScrollTop + ' actual=' + scrollArea.scrollTop + ' scrollHeight=' + scrollArea.scrollHeight);
     currentLine = lineNumber;
     if (onLineChange) onLineChange(currentLine, totalLines);
 }
@@ -442,8 +438,8 @@ export async function refreshContent() {
         cachedChunks.clear();
         renderGeneration++;
         await renderVisibleLines(true);
-    } catch (err) {
-        console.error('Failed to refresh:', err);
+    } catch {
+        // 새로고침 실패
     }
 }
 
@@ -481,8 +477,8 @@ export async function undo() {
         cachedChunks.clear();
         await refreshContent();
         if (onModified) onModified(currentFileId);
-    } catch (err) {
-        console.error('Undo failed:', err);
+    } catch {
+        // Undo 실패
     }
 }
 
@@ -493,7 +489,7 @@ export async function redo() {
         cachedChunks.clear();
         await refreshContent();
         if (onModified) onModified(currentFileId);
-    } catch (err) {
-        console.error('Redo failed:', err);
+    } catch {
+        // Redo 실패
     }
 }

@@ -1562,6 +1562,91 @@ select:focus-visible {
 }
 
 /* ========================================
+   EPUB Viewer
+   ======================================== */
+
+.epub-viewer-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.epub-nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.epub-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.epub-nav-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.epub-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.epub-chapter-select {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 12px;
+    outline: none;
+    text-overflow: ellipsis;
+}
+
+.epub-chapter-select:focus {
+    border-color: var(--border-focus);
+}
+
+.epub-chapter-select option {
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+.epub-chapter-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 50px;
+    text-align: center;
+}
+
+.epub-content {
+    flex: 1;
+    overflow: hidden;
+    padding: 0;
+    background: var(--bg-primary);
+    outline: none;
+}
+
+/* ========================================
    Text selection
    ======================================== */
 

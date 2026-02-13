@@ -1,13 +1,21 @@
+use crate::epub_reader::EpubBook;
 use crate::text_buffer::TextBuffer;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+pub enum FileType {
+    Text,
+    Epub,
+}
+
 pub struct Tab {
     pub path: PathBuf,
     pub buffer: Option<TextBuffer>,
+    pub epub_book: Option<EpubBook>,
     pub last_position: usize,
     pub is_modified: bool,
+    pub file_type: FileType,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -19,6 +27,8 @@ pub struct FileInfo {
     pub total_chars: usize,
     pub last_position: usize,
     pub is_modified: bool,
+    pub file_type: String,
+    pub total_chapters: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -28,6 +38,7 @@ pub struct TabInfo {
     pub path: String,
     pub is_active: bool,
     pub is_modified: bool,
+    pub file_type: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -64,15 +75,35 @@ impl TabManager {
             anyhow::bail!("File not found: {}", path);
         }
 
-        let buffer = TextBuffer::from_file(&file_path)?;
+        let ext = file_path
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if ext == "epub" {
+            self.open_epub(path, &file_path, last_position)
+        } else {
+            self.open_text(path, &file_path, last_position)
+        }
+    }
+
+    fn open_text(
+        &mut self,
+        path: &str,
+        file_path: &PathBuf,
+        last_position: usize,
+    ) -> anyhow::Result<FileInfo> {
+        let buffer = TextBuffer::from_file(file_path)?;
         let total_lines = buffer.get_total_lines();
         let total_chars = buffer.get_total_chars();
 
         let tab = Tab {
             path: file_path.clone(),
             buffer: Some(buffer),
+            epub_book: None,
             last_position,
             is_modified: false,
+            file_type: FileType::Text,
         };
 
         let file_name = file_path
@@ -91,6 +122,47 @@ impl TabManager {
             total_chars,
             last_position,
             is_modified: false,
+            file_type: "text".to_string(),
+            total_chapters: 0,
+        })
+    }
+
+    fn open_epub(
+        &mut self,
+        path: &str,
+        file_path: &PathBuf,
+        last_position: usize,
+    ) -> anyhow::Result<FileInfo> {
+        let epub_book = crate::epub_reader::parse_epub(file_path)?;
+        let total_chapters = epub_book.total_chapters();
+
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.to_string());
+
+        let tab = Tab {
+            path: file_path.clone(),
+            buffer: None,
+            epub_book: Some(epub_book),
+            last_position,
+            is_modified: false,
+            file_type: FileType::Epub,
+        };
+
+        self.tabs.insert(path.to_string(), tab);
+        self.active_tab = Some(path.to_string());
+
+        Ok(FileInfo {
+            id: path.to_string(),
+            name: file_name,
+            path: path.to_string(),
+            total_lines: 0,
+            total_chars: 0,
+            last_position,
+            is_modified: false,
+            file_type: "epub".to_string(),
+            total_chapters,
         })
     }
 
@@ -113,13 +185,12 @@ impl TabManager {
 
     /// Switch to an existing tab, lazy-loading the rope if it was unloaded.
     pub fn switch_tab(&mut self, id: &str) -> anyhow::Result<FileInfo> {
-        // Unload rope from the previously active tab to save memory
+        // Unload rope from the previously active tab to save memory (text only)
         if let Some(prev_id) = &self.active_tab {
             if prev_id != id {
                 let prev_id_clone = prev_id.clone();
                 if let Some(prev_tab) = self.tabs.get_mut(&prev_id_clone) {
-                    // Keep modified tabs loaded
-                    if !prev_tab.is_modified {
+                    if matches!(prev_tab.file_type, FileType::Text) && !prev_tab.is_modified {
                         prev_tab.buffer = None;
                     }
                 }
@@ -131,14 +202,31 @@ impl TabManager {
             .get_mut(id)
             .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", id))?;
 
-        // Lazy-load rope if needed
-        if tab.buffer.is_none() {
+        // Lazy-load rope if needed (text files only)
+        if matches!(tab.file_type, FileType::Text) && tab.buffer.is_none() {
             tab.buffer = Some(TextBuffer::from_file(&tab.path)?);
         }
 
-        let buffer = tab.buffer.as_ref().unwrap();
-        let total_lines = buffer.get_total_lines();
-        let total_chars = buffer.get_total_chars();
+        let (total_lines, total_chars, total_chapters, file_type_str) = match tab.file_type {
+            FileType::Text => {
+                let buffer = tab.buffer.as_ref().unwrap();
+                (
+                    buffer.get_total_lines(),
+                    buffer.get_total_chars(),
+                    0,
+                    "text".to_string(),
+                )
+            }
+            FileType::Epub => {
+                let chapters = tab
+                    .epub_book
+                    .as_ref()
+                    .map(|b| b.total_chapters())
+                    .unwrap_or(0);
+                (0, 0, chapters, "epub".to_string())
+            }
+        };
+
         let last_position = tab.last_position;
         let is_modified = tab.is_modified;
         let path_str = tab.path.to_string_lossy().to_string();
@@ -158,6 +246,8 @@ impl TabManager {
             total_chars,
             last_position,
             is_modified,
+            file_type: file_type_str,
+            total_chapters,
         })
     }
 
@@ -171,12 +261,17 @@ impl TabManager {
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_else(|| id.clone());
+                let file_type = match tab.file_type {
+                    FileType::Text => "text",
+                    FileType::Epub => "epub",
+                };
                 TabInfo {
                     id: id.clone(),
                     name,
                     path: tab.path.to_string_lossy().to_string(),
                     is_active: self.active_tab.as_deref() == Some(id.as_str()),
                     is_modified: tab.is_modified,
+                    file_type: file_type.to_string(),
                 }
             })
             .collect()
@@ -273,5 +368,53 @@ impl TabManager {
         if let Some(tab) = self.tabs.get_mut(file_id) {
             tab.last_position = position;
         }
+    }
+
+    /// Get EPUB chapter HTML by index.
+    pub fn get_epub_chapter_html(
+        &self,
+        file_id: &str,
+        chapter_index: usize,
+    ) -> anyhow::Result<String> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let epub_book = tab
+            .epub_book
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not an EPUB file: {}", file_id))?;
+        epub_book
+            .get_chapter_html(chapter_index)
+            .ok_or_else(|| anyhow::anyhow!("Chapter {} not found", chapter_index))
+    }
+
+    /// Get EPUB font styles (@font-face CSS).
+    pub fn get_epub_font_styles(&self, file_id: &str) -> anyhow::Result<String> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let epub_book = tab
+            .epub_book
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not an EPUB file: {}", file_id))?;
+        Ok(epub_book.font_styles.clone())
+    }
+
+    /// Get EPUB chapter info list.
+    pub fn get_epub_chapter_infos(
+        &self,
+        file_id: &str,
+    ) -> anyhow::Result<Vec<crate::epub_reader::ChapterInfo>> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let epub_book = tab
+            .epub_book
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not an EPUB file: {}", file_id))?;
+        Ok(epub_book.get_chapter_infos())
     }
 }

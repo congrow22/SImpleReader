@@ -1,6 +1,7 @@
 mod bookmark;
 mod commands;
 mod config;
+mod epub_reader;
 mod error;
 mod formatter;
 mod search;
@@ -117,6 +118,10 @@ pub fn run() {
             commands::is_context_menu_registered,
             // Font commands
             commands::get_system_fonts,
+            // EPUB commands
+            commands::get_epub_chapters,
+            commands::get_epub_chapter,
+            commands::get_epub_font_styles,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -84,6 +84,12 @@ const { invoke } = window.__TAURI__.core;
 const content = await invoke('read_text_file', { path: '/path/to/file' });
 ```
 
+## 응답 언어
+
+- **모든 답변은 한국어로 작성**
+- 코드 주석도 한국어 가능
+- 변수명/함수명은 영어 유지
+
 ## Git 커밋 정책
 
 - **커밋은 사용자의 명시적 지시가 있을 때만 수행**

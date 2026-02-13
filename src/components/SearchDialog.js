@@ -138,10 +138,6 @@ async function performSearch() {
             caseSensitive: caseSensitive
         });
 
-        console.log('[Search] Results for "' + query + '":', matches.map((m, i) =>
-            'match ' + i + ': line=' + m.line + ' charStart=' + m.line_char_start + ' charEnd=' + m.line_char_end
-        ));
-
         if (matches.length > 0) {
             currentMatchIndex = 0;
             searchCount.textContent = '1 / ' + matches.length;
@@ -154,8 +150,7 @@ async function performSearch() {
         if (onActiveMatchChange && currentMatchIndex >= 0) {
             onActiveMatchChange(currentMatchIndex);
         }
-    } catch (err) {
-        console.error('Search failed:', err);
+    } catch {
         matches = [];
         currentMatchIndex = -1;
         searchCount.textContent = '\uC624\uB958';
@@ -195,8 +190,8 @@ async function replaceOne() {
 
         if (onReplace) onReplace(currentFileId);
         await performSearch();
-    } catch (err) {
-        console.error('Replace failed:', err);
+    } catch {
+        // 바꾸기 실패
     }
 }
 
@@ -221,7 +216,7 @@ async function replaceAll() {
 
         if (onReplace) onReplace(currentFileId);
         if (onMatchesUpdate) onMatchesUpdate([], -1);
-    } catch (err) {
-        console.error('Replace all failed:', err);
+    } catch {
+        // 모두 바꾸기 실패
     }
 }

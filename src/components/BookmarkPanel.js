@@ -89,8 +89,7 @@ export async function refreshFileList() {
     try {
         fileList = await invoke('get_file_list');
         renderFileList();
-    } catch (err) {
-        console.error('Failed to load file list:', err);
+    } catch {
         fileList = [];
         renderFileList();
     }
@@ -195,8 +194,8 @@ async function toggleFavorite(filePath) {
     try {
         await invoke('toggle_favorite', { filePath: filePath });
         await refreshFileList();
-    } catch (err) {
-        console.error('Failed to toggle favorite:', err);
+    } catch {
+        // 즐겨찾기 토글 실패
     }
 }
 
@@ -261,8 +260,8 @@ async function removeFileEntry(filePath) {
         await invoke('remove_file_entry', { filePath: filePath });
         await refreshFileList();
         if (onFileRemove) onFileRemove(filePath);
-    } catch (err) {
-        console.error('Failed to remove file entry:', err);
+    } catch {
+        // 파일 항목 삭제 실패
     }
 }
 
@@ -295,8 +294,7 @@ async function loadFileBookmarks() {
     try {
         bookmarks = await invoke('get_bookmarks', { filePath: currentFilePath });
         renderBookmarks();
-    } catch (err) {
-        console.error('Failed to load bookmarks:', err);
+    } catch {
         bookmarks = [];
         renderBookmarks();
     }
@@ -311,8 +309,7 @@ async function loadAllBookmarks() {
             allBookmarks = await invoke('get_all_bookmarks');
         }
         renderBookmarks();
-    } catch (err) {
-        console.error('Failed to load all bookmarks:', err);
+    } catch {
         allBookmarks = [];
         renderBookmarks();
     }
@@ -330,8 +327,8 @@ export async function addBookmark(position, memo) {
         await refreshBookmarks();
         // Update file list to reflect new bookmark count
         await refreshFileList();
-    } catch (err) {
-        console.error('Failed to add bookmark:', err);
+    } catch {
+        // 책갈피 추가 실패
     }
 }
 
@@ -345,8 +342,8 @@ export async function removeBookmark(index) {
         });
         await refreshBookmarks();
         await refreshFileList();
-    } catch (err) {
-        console.error('Failed to remove bookmark:', err);
+    } catch {
+        // 책갈피 삭제 실패
     }
 }
 

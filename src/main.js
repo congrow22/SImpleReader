@@ -6,6 +6,7 @@
 import * as MenuBar from './components/MenuBar.js';
 import * as TabBar from './components/TabBar.js';
 import * as Editor from './components/Editor.js';
+import * as EpubViewer from './components/EpubViewer.js';
 import * as BookmarkPanel from './components/BookmarkPanel.js';
 import * as SearchDialog from './components/SearchDialog.js';
 import * as SettingsDialog from './components/SettingsDialog.js';
@@ -37,14 +38,15 @@ async function initApp() {
     try {
         const config = await invoke('get_config');
         applyConfig(config);
-    } catch (err) {
-        console.warn('Could not load config:', err);
+    } catch {
+        // 설정 로드 실패시 기본값 사용
     }
 
     // Initialize all components
     initMenuBar();
     initTabBar();
     initEditor();
+    initEpubViewer();
     initBookmarkPanel();
     initSearchDialog();
     initSettingsDialog();
@@ -163,6 +165,14 @@ function initEditor() {
         },
         onEditModeChange: (editMode) => {
             updateEditModeUI(editMode);
+        }
+    });
+}
+
+function initEpubViewer() {
+    EpubViewer.init({
+        onChapterChange: (chapterIndex, totalChapters, chapterTitle) => {
+            updateEpubStatusBar(chapterIndex, totalChapters);
         }
     });
 }
@@ -478,8 +488,8 @@ function initDragAndDrop() {
             overlay.classList.add('hidden');
             dragCounter = 0;
         });
-    } catch (err) {
-        console.warn('Tauri drag-drop events not available:', err);
+    } catch {
+        // drag-drop 이벤트 미지원 환경
     }
 }
 
@@ -549,14 +559,18 @@ async function handleOpenFile() {
     try {
         const filePath = await openDialog({
             multiple: false,
-            filters: [{ name: 'Text Files', extensions: ['txt', 'md', 'log', 'csv', 'json'] }]
+            filters: [
+                { name: 'Supported Files', extensions: ['txt', 'md', 'log', 'csv', 'json', 'epub'] },
+                { name: 'Text Files', extensions: ['txt', 'md', 'log', 'csv', 'json'] },
+                { name: 'EPUB Files', extensions: ['epub'] }
+            ]
         });
 
         if (filePath) {
             await openFile(filePath);
         }
-    } catch (err) {
-        console.error('Failed to open file dialog:', err);
+    } catch {
+        // 파일 대화상자 오류
     }
 }
 
@@ -568,9 +582,21 @@ async function openFile(path) {
         state.activeFileId = fileInfo.id;
 
         TabBar.addTab(fileInfo);
-        await Editor.loadFile(fileInfo);
 
-        SearchDialog.setFileId(fileInfo.id);
+        if (fileInfo.file_type === 'epub') {
+            // EPUB: show epub viewer, hide text editor
+            Editor.clear();
+            document.getElementById('editor-container').classList.add('hidden');
+            await EpubViewer.loadFile(fileInfo);
+            updateEpubStatusBar(fileInfo.last_position || 0, fileInfo.total_chapters);
+        } else {
+            // Text: show text editor, hide epub viewer
+            EpubViewer.hide();
+            document.getElementById('editor-container').classList.remove('hidden');
+            await Editor.loadFile(fileInfo);
+            SearchDialog.setFileId(fileInfo.id);
+        }
+
         BookmarkPanel.loadBookmarks(fileInfo.path);
 
         // Track file open for file list
@@ -582,21 +608,24 @@ async function openFile(path) {
         }
 
         updateStatusBar();
-    } catch (err) {
-        console.error('Failed to open file:', err);
+        updateEpubUI(fileInfo.file_type === 'epub');
+    } catch {
         const shouldRemove = confirm('파일을 찾을 수 없습니다.\n목록에서 삭제하시겠습니까?\n\n' + path);
         if (shouldRemove) {
             try {
                 await invoke('remove_file_entry', { filePath: path });
                 BookmarkPanel.refreshFileList();
-            } catch (e) {
-                console.error('Failed to remove file entry:', e);
+            } catch {
+                // 파일 항목 삭제 실패
             }
         }
     }
 }
 
 async function handleSave() {
+    // EPUB files are read-only
+    if (EpubViewer.isVisible()) return;
+
     const fileId = Editor.getCurrentFileId();
     if (!fileId) return;
 
@@ -606,8 +635,8 @@ async function handleSave() {
         if (info) info.is_modified = false;
         TabBar.updateTab(fileId, { is_modified: false });
         updateStatusBar();
-    } catch (err) {
-        console.error('Failed to save file:', err);
+    } catch {
+        // 저장 실패
     }
 }
 
@@ -621,8 +650,8 @@ async function handleCloseCurrentTab() {
 async function handleTabClose(fileId) {
     try {
         await invoke('close_file', { fileId: fileId });
-    } catch (err) {
-        console.warn('close_file error:', err);
+    } catch {
+        // 탭 닫기 오류
     }
 
     state.files.delete(fileId);
@@ -632,8 +661,11 @@ async function handleTabClose(fileId) {
     if (!newActiveId) {
         state.activeFileId = null;
         Editor.clear();
+        EpubViewer.clear();
+        document.getElementById('editor-container').classList.remove('hidden');
         SearchDialog.setFileId(null);
         updateStatusBar();
+        updateEpubUI(false);
     }
 }
 
@@ -641,23 +673,41 @@ async function handleTabSwitch(fileId) {
     if (!fileId) {
         state.activeFileId = null;
         Editor.clear();
+        EpubViewer.clear();
+        document.getElementById('editor-container').classList.remove('hidden');
         updateStatusBar();
+        updateEpubUI(false);
         return;
     }
 
     state.activeFileId = fileId;
 
-    // Save last position for previous file
-    const prevFilePath = Editor.getCurrentFilePath();
-    const prevLine = Editor.getCurrentLine();
-    if (prevFilePath && prevLine > 0) {
-        try {
-            await invoke('save_last_position', {
-                filePath: prevFilePath,
-                position: prevLine
-            });
-        } catch (err) {
-            // non-critical
+    // Save last position for previous file (text files only)
+    if (!EpubViewer.isVisible()) {
+        const prevFilePath = Editor.getCurrentFilePath();
+        const prevLine = Editor.getCurrentLine();
+        if (prevFilePath && prevLine > 0) {
+            try {
+                await invoke('save_last_position', {
+                    filePath: prevFilePath,
+                    position: prevLine
+                });
+            } catch (err) {
+                // non-critical
+            }
+        }
+    } else {
+        // Save EPUB chapter position
+        const prevFilePath = EpubViewer.getCurrentFilePath();
+        if (prevFilePath) {
+            try {
+                await invoke('save_last_position', {
+                    filePath: prevFilePath,
+                    position: EpubViewer.getCurrentChapter()
+                });
+            } catch (err) {
+                // non-critical
+            }
         }
     }
 
@@ -666,18 +716,37 @@ async function handleTabSwitch(fileId) {
         const fileInfo = await invoke('switch_tab', { fileId: fileId });
         if (fileInfo) {
             state.files.set(fileId, fileInfo);
-            await Editor.loadFile(fileInfo);
-            SearchDialog.setFileId(fileId);
+
+            if (fileInfo.file_type === 'epub') {
+                Editor.clear();
+                document.getElementById('editor-container').classList.add('hidden');
+                await EpubViewer.loadFile(fileInfo);
+                updateEpubStatusBar(fileInfo.last_position || 0, fileInfo.total_chapters);
+            } else {
+                EpubViewer.hide();
+                document.getElementById('editor-container').classList.remove('hidden');
+                await Editor.loadFile(fileInfo);
+                SearchDialog.setFileId(fileId);
+            }
+
             BookmarkPanel.loadBookmarks(fileInfo.path);
+            updateEpubUI(fileInfo.file_type === 'epub');
         }
-    } catch (err) {
-        console.error('Failed to switch tab:', err);
-        // Try to load from cached info
+    } catch {
         const cachedInfo = state.files.get(fileId);
         if (cachedInfo) {
-            await Editor.loadFile(cachedInfo);
-            SearchDialog.setFileId(fileId);
+            if (cachedInfo.file_type === 'epub') {
+                Editor.clear();
+                document.getElementById('editor-container').classList.add('hidden');
+                await EpubViewer.loadFile(cachedInfo);
+            } else {
+                EpubViewer.hide();
+                document.getElementById('editor-container').classList.remove('hidden');
+                await Editor.loadFile(cachedInfo);
+                SearchDialog.setFileId(fileId);
+            }
             BookmarkPanel.loadBookmarks(cachedInfo.path);
+            updateEpubUI(cachedInfo.file_type === 'epub');
         }
     }
 
@@ -689,15 +758,16 @@ async function handleTabSwitch(fileId) {
 // ============================================================
 
 function handleAddBookmark() {
-    const fileId = Editor.getCurrentFileId();
-    const filePath = Editor.getCurrentFilePath();
+    // For EPUB, use EPUB viewer's file info and chapter as position
+    const isEpub = EpubViewer.isVisible();
+    const fileId = isEpub ? EpubViewer.getCurrentFileId() : Editor.getCurrentFileId();
+    const filePath = isEpub ? EpubViewer.getCurrentFilePath() : Editor.getCurrentFilePath();
     if (!fileId || !filePath) {
-        // If no file, toggle panel instead
         BookmarkPanel.togglePanel();
         return;
     }
 
-    const currentLine = Editor.getCurrentLine();
+    const currentLine = isEpub ? EpubViewer.getCurrentChapter() : Editor.getCurrentLine();
     const dialogEl = document.getElementById('bookmark-add-dialog');
     const infoEl = document.getElementById('bookmark-add-info');
     const memoInput = document.getElementById('bookmark-memo-input');
@@ -755,6 +825,8 @@ function handleAddBookmark() {
 // ============================================================
 
 function handleToggleEditMode() {
+    // Disable edit mode for EPUB files
+    if (EpubViewer.isVisible()) return;
     const editMode = Editor.toggleEditMode();
     updateEditModeUI(editMode);
 }
@@ -812,8 +884,8 @@ async function handleToggleLineNumbers() {
         const config = await invoke('get_config');
         config.show_line_numbers = lineNumbersVisible;
         await invoke('save_config', { config });
-    } catch (err) {
-        console.warn('Could not save line numbers setting:', err);
+    } catch {
+        // 줄번호 설정 저장 실패
     }
 }
 
@@ -821,7 +893,47 @@ async function handleToggleLineNumbers() {
 // Status Bar
 // ============================================================
 
+/**
+ * Update UI elements when switching between EPUB and text mode.
+ * Disables edit/save/format buttons for EPUB files.
+ */
+function updateEpubUI(isEpub) {
+    const btnSave = document.getElementById('btn-save');
+    const btnEditMode = document.getElementById('btn-edit-mode');
+    if (btnSave) {
+        btnSave.disabled = isEpub ? true : btnSave.disabled;
+        if (isEpub) btnSave.classList.remove('has-changes');
+    }
+    if (btnEditMode) {
+        btnEditMode.disabled = isEpub;
+        if (isEpub) {
+            btnEditMode.classList.remove('active');
+        }
+    }
+    const statusMode = document.getElementById('status-mode');
+    if (statusMode) {
+        statusMode.textContent = isEpub ? 'EPUB' : (Editor.isEditMode() ? '편집' : '뷰어');
+    }
+}
+
+function updateEpubStatusBar(chapterIndex, totalChapters) {
+    const percent = totalChapters > 0
+        ? ((chapterIndex + 1) / totalChapters * 100).toFixed(1)
+        : '0.0';
+    document.getElementById('status-line').textContent =
+        '챕터: ' + (chapterIndex + 1) + ' / ' + totalChapters + ' (' + percent + ' %)';
+    document.getElementById('status-chars').textContent = '';
+    document.getElementById('status-encoding').textContent = 'EPUB';
+    document.getElementById('status-modified').textContent = '';
+}
+
 function updateStatusBar() {
+    // If EPUB viewer is active, use epub status bar
+    if (EpubViewer.isVisible()) {
+        updateEpubStatusBar(EpubViewer.getCurrentChapter(), EpubViewer.getTotalChapters());
+        return;
+    }
+
     const fileId = Editor.getCurrentFileId();
 
     if (!fileId) {
@@ -884,6 +996,5 @@ function showHelp() {
         'Ctrl+Shift+F  \uD14D\uC2A4\uD2B8 \uC815\uB9AC'
     ].join('\n');
 
-    // Using a simple approach since we don't have a dedicated help modal
-    console.log('SimpleReader Shortcuts:\n' + shortcuts);
+    alert(shortcuts);
 }
