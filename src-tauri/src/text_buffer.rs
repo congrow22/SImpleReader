@@ -8,6 +8,8 @@ pub enum EditOperation {
     Replace { position: usize, old_text: String, new_text: String },
 }
 
+const MAX_UNDO: usize = 100;
+
 pub struct TextBuffer {
     rope: Rope,
     undo_stack: Vec<EditOperation>,
@@ -62,11 +64,18 @@ impl TextBuffer {
         lines
     }
 
+    fn push_undo(&mut self, op: EditOperation) {
+        self.undo_stack.push(op);
+        if self.undo_stack.len() > MAX_UNDO {
+            self.undo_stack.drain(0..self.undo_stack.len() - MAX_UNDO);
+        }
+    }
+
     /// Insert text at a character position.
     pub fn insert_text(&mut self, char_pos: usize, text: &str) {
         let pos = char_pos.min(self.rope.len_chars());
         self.rope.insert(pos, text);
-        self.undo_stack.push(EditOperation::Insert {
+        self.push_undo(EditOperation::Insert {
             position: pos,
             text: text.to_string(),
         });
@@ -109,7 +118,7 @@ impl TextBuffer {
             self.rope.insert(start_char, new_text_clean);
         }
 
-        self.undo_stack.push(EditOperation::Replace {
+        self.push_undo(EditOperation::Replace {
             position: start_char,
             old_text,
             new_text: new_text_clean.to_string(),
@@ -129,7 +138,7 @@ impl TextBuffer {
         }
         let deleted = self.rope.slice(start..end).to_string();
         self.rope.remove(start..end);
-        self.undo_stack.push(EditOperation::Delete {
+        self.push_undo(EditOperation::Delete {
             position: start,
             text: deleted,
         });
@@ -222,11 +231,11 @@ impl TextBuffer {
     pub fn replace_all(&mut self, new_text: &str) {
         let old_text = self.rope.to_string();
         self.rope = Rope::from_str(new_text);
-        self.undo_stack.push(EditOperation::Delete {
+        self.push_undo(EditOperation::Delete {
             position: 0,
             text: old_text,
         });
-        self.undo_stack.push(EditOperation::Insert {
+        self.push_undo(EditOperation::Insert {
             position: 0,
             text: new_text.to_string(),
         });
