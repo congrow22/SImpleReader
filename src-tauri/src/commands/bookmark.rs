@@ -97,6 +97,30 @@ pub async fn toggle_favorite(
 }
 
 #[command]
+pub async fn reorder_file_list(
+    ordered_paths: Vec<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .reorder_file_list(&ordered_paths)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn move_bookmark(
+    file_path: String,
+    from_index: usize,
+    to_index: usize,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .move_bookmark(&file_path, from_index, to_index)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
 pub async fn save_last_position(
     file_path: String,
     position: usize,

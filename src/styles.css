@@ -856,6 +856,26 @@ html, body {
     color: var(--danger);
 }
 
+/* 드래그 순서 변경 */
+.file-list-item.dragging,
+.bookmark-item.dragging {
+    opacity: 0.8;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    position: relative;
+    cursor: grabbing;
+}
+
+.file-list-item.drag-over-above,
+.bookmark-item.drag-over-above {
+    border-top: 2px solid var(--accent);
+}
+
+.file-list-item.drag-over-below,
+.bookmark-item.drag-over-below {
+    border-bottom: 2px solid var(--accent);
+}
+
 .bookmark-empty {
     display: flex;
     align-items: center;

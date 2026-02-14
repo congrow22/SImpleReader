@@ -19,6 +19,8 @@ pub struct FileBookmarks {
     pub favorite: bool,
     #[serde(default)]
     pub last_scroll_offset: usize,
+    #[serde(default)]
+    pub display_order: Option<usize>,
 }
 
 impl Default for FileBookmarks {
@@ -29,6 +31,7 @@ impl Default for FileBookmarks {
             bookmarks: Vec::new(),
             favorite: false,
             last_scroll_offset: 0,
+            display_order: None,
         }
     }
 }
@@ -48,6 +51,7 @@ pub struct FileListEntry {
     pub last_opened: String,
     pub bookmark_count: usize,
     pub favorite: bool,
+    pub display_order: Option<usize>,
 }
 
 pub struct BookmarkStore {
@@ -205,12 +209,42 @@ impl BookmarkStore {
                     last_opened: file_bookmarks.last_opened.clone(),
                     bookmark_count: file_bookmarks.bookmarks.len(),
                     favorite: file_bookmarks.favorite,
+                    display_order: file_bookmarks.display_order,
                 }
             })
             .collect();
-        // Sort by last_opened descending (most recent first)
-        entries.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+        // display_order가 있는 항목 우선(오름차순), 없으면 last_opened 내림차순
+        entries.sort_by(|a, b| {
+            match (a.display_order, b.display_order) {
+                (Some(oa), Some(ob)) => oa.cmp(&ob),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => b.last_opened.cmp(&a.last_opened),
+            }
+        });
         entries
+    }
+
+    /// 파일 목록 순서 변경. ordered_paths 순서대로 display_order 설정.
+    pub fn reorder_file_list(&mut self, ordered_paths: &[String]) -> anyhow::Result<()> {
+        for (i, path) in ordered_paths.iter().enumerate() {
+            if let Some(entry) = self.data.get_mut(path) {
+                entry.display_order = Some(i);
+            }
+        }
+        self.save_to_disk()
+    }
+
+    /// 책갈피 순서 변경 (from → to 위치로 이동).
+    pub fn move_bookmark(&mut self, file_path: &str, from: usize, to: usize) -> anyhow::Result<()> {
+        let entry = self.data.get_mut(file_path)
+            .ok_or_else(|| anyhow::anyhow!("File not found: {}", file_path))?;
+        if from >= entry.bookmarks.len() || to >= entry.bookmarks.len() {
+            anyhow::bail!("Bookmark index out of range");
+        }
+        let item = entry.bookmarks.remove(from);
+        entry.bookmarks.insert(to, item);
+        self.save_to_disk()
     }
 
     /// Toggle favorite status for a file.

@@ -102,6 +102,8 @@ pub fn run() {
             commands::get_file_list,
             commands::remove_file_entry,
             commands::toggle_favorite,
+            commands::reorder_file_list,
+            commands::move_bookmark,
             // Search commands
             commands::search_text,
             commands::replace_text,

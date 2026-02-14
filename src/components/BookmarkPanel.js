@@ -65,6 +65,9 @@ export function init(options = {}) {
 
     // Load file list on init
     refreshFileList();
+
+    // 롱프레스 드래그 순서 변경
+    initDragReorder();
 }
 
 function switchView(view) {
@@ -484,4 +487,132 @@ export function setCollapsed(collapsed) {
     } else {
         panel.classList.remove('collapsed');
     }
+}
+
+// ============================================================
+// Long-press Drag Reorder
+// ============================================================
+
+function initDragReorder() {
+    setupDragForContainer(fileListContainer, '.file-list-item', handleFileReorder, null);
+    setupDragForContainer(listContainer, '.bookmark-item', handleBookmarkReorder, () => !isAllMode);
+}
+
+function setupDragForContainer(container, itemSelector, onReorder, canDrag) {
+    let pressTimer = null;
+    let pressCleanup = null;
+
+    container.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        if (canDrag && !canDrag()) return;
+        const item = e.target.closest(itemSelector);
+        if (!item || e.target.closest('button')) return;
+
+        const startY = e.clientY;
+        const pointerId = e.pointerId;
+
+        pressTimer = setTimeout(() => {
+            if (pressCleanup) { pressCleanup(); pressCleanup = null; }
+            beginDrag(container, item, itemSelector, startY, pointerId, onReorder);
+        }, 1000);
+
+        const onMove = (ev) => {
+            if (Math.abs(ev.clientY - startY) > 10) {
+                clearTimeout(pressTimer);
+                if (pressCleanup) { pressCleanup(); pressCleanup = null; }
+            }
+        };
+
+        pressCleanup = () => {
+            clearTimeout(pressTimer);
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', doCleanup);
+            document.removeEventListener('pointercancel', doCleanup);
+        };
+        const doCleanup = () => { if (pressCleanup) { pressCleanup(); pressCleanup = null; } };
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', doCleanup);
+        document.addEventListener('pointercancel', doCleanup);
+    });
+}
+
+function beginDrag(container, dragItem, itemSelector, startY, pointerId, onReorder) {
+    const items = Array.from(container.querySelectorAll(itemSelector));
+    const dragIndex = items.indexOf(dragItem);
+    if (dragIndex < 0) return;
+
+    try { dragItem.setPointerCapture(pointerId); } catch { /* ignore */ }
+
+    const rects = items.map(el => {
+        const r = el.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, mid: r.top + r.height / 2 };
+    });
+
+    dragItem.classList.add('dragging');
+
+    const onMove = (e) => {
+        e.preventDefault();
+        const dy = e.clientY - startY;
+        dragItem.style.transform = 'translateY(' + dy + 'px)';
+
+        items.forEach((el, i) => {
+            el.classList.remove('drag-over-above', 'drag-over-below');
+            if (el === dragItem) return;
+            if (e.clientY >= rects[i].top - 5 && e.clientY < rects[i].mid) {
+                el.classList.add('drag-over-above');
+            } else if (e.clientY >= rects[i].mid && e.clientY <= rects[i].bottom + 5) {
+                el.classList.add('drag-over-below');
+            }
+        });
+    };
+
+    const onEnd = (e) => {
+        let insertBefore = items.length;
+        const y = e.clientY;
+        for (let i = 0; i < rects.length; i++) {
+            if (y < rects[i].mid) { insertBefore = i; break; }
+        }
+        let toIndex = insertBefore > dragIndex ? insertBefore - 1 : insertBefore;
+
+        dragItem.classList.remove('dragging');
+        dragItem.style.transform = '';
+        items.forEach(el => el.classList.remove('drag-over-above', 'drag-over-below'));
+        try { dragItem.releasePointerCapture(pointerId); } catch { /* ignore */ }
+
+        dragItem.removeEventListener('pointermove', onMove);
+        dragItem.removeEventListener('pointerup', onEnd);
+        dragItem.removeEventListener('pointercancel', onEnd);
+
+        if (toIndex !== dragIndex) {
+            onReorder(dragIndex, toIndex);
+        }
+    };
+
+    dragItem.addEventListener('pointermove', onMove);
+    dragItem.addEventListener('pointerup', onEnd);
+    dragItem.addEventListener('pointercancel', onEnd);
+}
+
+async function handleFileReorder(fromIndex, toIndex) {
+    const displayed = showFavoritesOnly ? fileList.filter(e => e.favorite) : fileList;
+    const paths = displayed.map(e => e.file_path);
+    const [moved] = paths.splice(fromIndex, 1);
+    paths.splice(toIndex, 0, moved);
+    try {
+        await invoke('reorder_file_list', { orderedPaths: paths });
+        await refreshFileList();
+    } catch { /* ignore */ }
+}
+
+async function handleBookmarkReorder(fromIndex, toIndex) {
+    if (!currentFilePath) return;
+    try {
+        await invoke('move_bookmark', {
+            filePath: currentFilePath,
+            fromIndex: fromIndex,
+            toIndex: toIndex
+        });
+        await refreshBookmarks();
+    } catch { /* ignore */ }
 }
