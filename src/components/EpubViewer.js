@@ -312,18 +312,24 @@ async function loadAllChapters(scrollOffset) {
         continuousContainer.appendChild(wrapper);
     }
 
-    // Phase 2: 대상 챕터 wrapper 위치로 근사 스크롤 후 즉시 표시
-    // extraOffset은 iframe 문서 내 scrollY이므로 wrapper 기준으로 복원
-    pendingScrollRestore = (scrollTarget > 0 || extraOffset > 0) ? { chapter: scrollTarget, offset: extraOffset } : null;
-    if (scrollTarget > 0 || extraOffset > 0) {
-        const wrapper = continuousContainer.querySelector('[data-chapter-index="' + scrollTarget + '"]');
-        if (wrapper) {
-            continuousContainer.scrollTop = wrapper.offsetTop;
-        }
+    // Phase 2: 대상 챕터를 먼저 로드하고 렌더링 완료 대기
+    // (플레이스홀더 높이 기반 근사 스크롤 대신, 실제 렌더링 후 정확한 위치로 이동)
+    pendingScrollRestore = null;
+    const targetWrapper = continuousContainer.querySelector('[data-chapter-index="' + scrollTarget + '"]');
+    if (targetWrapper) {
+        // 근사 위치로 우선 이동 (IntersectionObserver가 주변 챕터를 감지하도록)
+        continuousContainer.scrollTop = targetWrapper.offsetTop;
+        renderedChapters.add(scrollTarget);
+        await loadChapterAndWait(targetWrapper, scrollTarget);
+    }
+
+    // Phase 3: 대상 챕터 로드 완료 후 정확한 스크롤 위치 설정
+    if (targetWrapper) {
+        continuousContainer.scrollTop = targetWrapper.offsetTop + extraOffset;
     }
     continuousContainer.style.visibility = 'visible';
 
-    // Phase 3: IntersectionObserver로 뷰포트 근처 챕터만 렌더링
+    // Phase 4: IntersectionObserver로 나머지 챕터 레이지 로딩
     chapterObserver = new IntersectionObserver(handleChapterIntersect, {
         root: continuousContainer,
         rootMargin: '500px 0px',
@@ -343,6 +349,37 @@ function handleChapterIntersect(entries) {
         if (renderedChapters.has(index)) continue;
         renderedChapters.add(index);
         renderLazyChapter(entry.target, index);
+    }
+}
+
+/**
+ * 챕터를 로드하고 iframe 렌더링 완료까지 대기 (모드 전환 시 정확한 위치 설정용)
+ */
+async function loadChapterAndWait(wrapper, index) {
+    try {
+        const html = await invoke('get_epub_chapter', { fileId: currentFileId, chapterIndex: index });
+        const baseStyles = getBaseStyles();
+        const chIframe = document.createElement('iframe');
+        chIframe.className = 'epub-chapter-frame';
+        chIframe.style.cssText = 'width:100%;border:none;display:block;overflow:hidden;';
+        const srcdoc = buildSrcdoc(baseStyles, sanitizeHtml(html));
+
+        await new Promise((resolve) => {
+            chIframe.onload = () => {
+                setupIframeContent(chIframe);
+                resizeIframeToContent(chIframe);
+                wrapper.style.minHeight = '0';
+                if (zoomLevel !== 100 && chIframe.contentDocument && chIframe.contentDocument.body) {
+                    chIframe.contentDocument.body.style.zoom = (zoomLevel / 100).toString();
+                    resizeIframeToContent(chIframe);
+                }
+                resolve();
+            };
+            chIframe.srcdoc = srcdoc;
+            wrapper.appendChild(chIframe);
+        });
+    } catch {
+        wrapper.style.minHeight = '0';
     }
 }
 
@@ -434,14 +471,14 @@ function scrollToChapter(index) {
 function trackChapterOnScroll() {
     if (!continuousMode || !continuousContainer) return;
 
+    // divider의 offsetTop과 scrollTop을 비교하여 현재 챕터 판별
+    // (wrapper는 divider 아래에 위치하므로 divider 기준이 정확)
     const dividers = continuousContainer.querySelectorAll('[data-chapter]');
-    const threshold = continuousContainer.clientHeight * 0.3;
-    const containerTop = continuousContainer.getBoundingClientRect().top;
+    const scrollTop = continuousContainer.scrollTop;
 
     let visibleChapter = 0;
     for (const div of dividers) {
-        const rect = div.getBoundingClientRect();
-        if (rect.top - containerTop <= threshold) {
+        if (div.offsetTop <= scrollTop + 10) {
             visibleChapter = parseInt(div.dataset.chapter, 10);
         } else {
             break;
@@ -453,12 +490,6 @@ function trackChapterOnScroll() {
         chapterSelect.value = visibleChapter;
         const chTitle = chapters[visibleChapter] ? chapters[visibleChapter].title : ('Chapter ' + (visibleChapter + 1));
         chapterLabel.textContent = (visibleChapter + 1) + ' / ' + totalChapters;
-
-        // Save position
-        invoke('get_epub_chapter', {
-            fileId: currentFileId,
-            chapterIndex: visibleChapter
-        }).catch(() => {});
 
         if (onChapterChange) {
             onChapterChange(currentChapterIndex, totalChapters, chTitle);
@@ -626,6 +657,8 @@ export function navigateToChapter(index, scrollPosition) {
             continuousContainer.scrollTop = wrapper.offsetTop + (scrollPosition || 0);
             currentChapterIndex = index;
             chapterSelect.value = index;
+            const chTitle = chapters[index] ? chapters[index].title : ('Chapter ' + (index + 1));
+            chapterLabel.textContent = (index + 1) + ' / ' + totalChapters;
         }
         // 대상 챕터가 아직 로드 안 됐으면 즉시 로드
         if (wrapper && !renderedChapters.has(index)) {

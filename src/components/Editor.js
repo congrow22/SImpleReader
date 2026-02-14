@@ -24,6 +24,8 @@ let onModified = null;
 let onLineChange = null;
 let onEditModeChange = null;
 let editMode = false;
+let pendingScrollToMatch = false;
+let suppressScrollRender = false;
 
 // DOM elements
 const container = document.getElementById('editor-container');
@@ -163,6 +165,10 @@ function updateScrollHeight() {
 }
 
 function onScroll() {
+    if (suppressScrollRender) {
+        suppressScrollRender = false;
+        return;
+    }
     if (scrollRAF) return;
     scrollRAF = requestAnimationFrame(async () => {
         scrollRAF = null;
@@ -217,6 +223,23 @@ async function renderVisibleLines(force = false) {
 
         renderedStartLine = startLine;
         renderedEndLine = endLine;
+
+        // 검색 결과 스크롤 보정: 줄 바꿈(wrapping)으로 인한 위치 오차 보정
+        // 렌더링 후 실제 DOM 위치 기반으로 정확히 중앙 정렬하고,
+        // 보정으로 인한 재렌더링을 1회 억제하여 위치 안정성 확보
+        if (pendingScrollToMatch) {
+            pendingScrollToMatch = false;
+            const activeEl = linesContainer.querySelector('.search-match-active');
+            if (activeEl) {
+                const elRect = activeEl.getBoundingClientRect();
+                const scrollRect = scrollArea.getBoundingClientRect();
+                const offset = (elRect.top + elRect.height / 2) - (scrollRect.top + scrollRect.height / 2);
+                if (Math.abs(offset) > 2) {
+                    suppressScrollRender = true;
+                    scrollArea.scrollTop += offset;
+                }
+            }
+        }
     } catch {
         // 렌더링 실패
     }
@@ -405,6 +428,7 @@ export function setActiveMatch(index) {
     if (index >= 0 && index < searchMatches.length) {
         const match = searchMatches[index];
         scrollToLine(match.line + 1);
+        pendingScrollToMatch = true;
     }
     cachedChunks.clear();
     scheduleRender();
@@ -413,8 +437,14 @@ export function setActiveMatch(index) {
 export function clearSearchHighlights() {
     searchMatches = [];
     activeMatchIndex = -1;
+    // 재렌더링 없이 DOM에서 하이라이트만 직접 제거 (스크롤 위치 유지)
+    linesContainer.querySelectorAll('.search-match').forEach(el => {
+        el.classList.remove('search-match', 'search-match-active');
+    });
+    linesContainer.querySelectorAll('mark').forEach(mark => {
+        mark.replaceWith(mark.textContent);
+    });
     cachedChunks.clear();
-    scheduleRender();
 }
 
 export function scrollToLine(lineNumber) {

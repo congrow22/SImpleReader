@@ -168,11 +168,11 @@ export async function loadFile(fileInfo) {
     if (currentPage < 1) currentPage = 1;
 
     try {
-        const bytes = await invoke('read_pdf_bytes', { fileId: currentFileId });
-        const data = new Uint8Array(bytes);
+        // ipc::Response로 바이너리 직접 전송 (JSON 직렬화 없이 ArrayBuffer로 수신)
+        const data = await invoke('read_pdf_bytes', { fileId: currentFileId });
         pdfDoc = await pdfjsLib.getDocument({ data }).promise;
         totalPages = pdfDoc.numPages;
-    } catch (e) {
+    } catch {
         pdfDoc = null;
         totalPages = 0;
     }
