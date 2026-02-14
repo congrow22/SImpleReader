@@ -34,6 +34,11 @@ let renderedChapters = new Set();
 let pendingScrollRestore = null; // { chapter, offset } - 대상 챕터 로드 후 정확한 스크롤 복원용
 const CHAPTER_ESTIMATED_HEIGHT = 800;
 
+// 챕터 로딩 큐 (동시 로딩 수 제한으로 전환 속도 개선)
+let chapterLoadQueue = [];
+let activeChapterLoads = 0;
+const MAX_CONCURRENT_CHAPTER_LOADS = 2;
+
 // DOM elements
 const container = document.getElementById('epub-viewer-container');
 const chapterSelect = document.getElementById('epub-chapter-select');
@@ -330,9 +335,11 @@ async function loadAllChapters(scrollOffset) {
     continuousContainer.style.visibility = 'visible';
 
     // Phase 4: IntersectionObserver로 나머지 챕터 레이지 로딩
+    chapterLoadQueue = [];
+    activeChapterLoads = 0;
     chapterObserver = new IntersectionObserver(handleChapterIntersect, {
         root: continuousContainer,
-        rootMargin: '500px 0px',
+        rootMargin: '200px 0px',
     });
     continuousContainer.querySelectorAll('.epub-chapter-wrapper').forEach(w => {
         chapterObserver.observe(w);
@@ -348,7 +355,23 @@ function handleChapterIntersect(entries) {
         const index = parseInt(entry.target.dataset.chapterIndex, 10);
         if (renderedChapters.has(index)) continue;
         renderedChapters.add(index);
-        renderLazyChapter(entry.target, index);
+        enqueueChapterLoad(entry.target, index);
+    }
+}
+
+function enqueueChapterLoad(wrapper, index) {
+    chapterLoadQueue.push({ wrapper, index });
+    processChapterLoadQueue();
+}
+
+function processChapterLoadQueue() {
+    while (activeChapterLoads < MAX_CONCURRENT_CHAPTER_LOADS && chapterLoadQueue.length > 0) {
+        const { wrapper, index } = chapterLoadQueue.shift();
+        activeChapterLoads++;
+        renderLazyChapter(wrapper, index).then(() => {
+            activeChapterLoads--;
+            processChapterLoadQueue();
+        });
     }
 }
 
@@ -618,6 +641,8 @@ export function hide() {
 
 export function clear() {
     if (chapterObserver) { chapterObserver.disconnect(); chapterObserver = null; }
+    chapterLoadQueue = [];
+    activeChapterLoads = 0;
     renderedChapters.clear();
     currentFileId = null;
     currentFilePath = null;

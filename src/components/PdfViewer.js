@@ -35,6 +35,15 @@ let rendering = false;
 let pageObserver = null;
 let renderedPages = new Set();
 
+// 렌더링 큐 (동시 렌더링 수 제한으로 전환 속도 개선)
+let pageRenderQueue = [];
+let activePageRenders = 0;
+const MAX_CONCURRENT_PAGE_RENDERS = 2;
+
+// 기준 페이지 크기 캐시 (줌 변경 시 재사용)
+let refPageWidth = 0;
+let refPageHeight = 0;
+
 // DOM elements
 const container = document.getElementById('pdf-viewer-container');
 const pageInput = document.getElementById('pdf-page-input');
@@ -155,9 +164,50 @@ function setZoom(level) {
     zoomLabel.textContent = zoomLevel + '%';
 
     if (continuousMode) {
-        renderAllPages(currentPage);
+        reRenderVisiblePages();
     } else {
         renderPage(currentPage);
+    }
+}
+
+/**
+ * 줌 변경 시: 모든 placeholder 크기 갱신 + 렌더 완료된 페이지만 재렌더링
+ * (renderAllPages 호출 대신 — DOM 전체 파괴/재생성 방지)
+ */
+async function reRenderVisiblePages() {
+    if (!pdfDoc) return;
+
+    const scale = zoomLevel / 100;
+    const firstPage = await pdfDoc.getPage(1);
+    const vp = firstPage.getViewport({ scale: scale * window.devicePixelRatio });
+    const cssW = (vp.width / window.devicePixelRatio) + 'px';
+    const cssH = (vp.height / window.devicePixelRatio) + 'px';
+    refPageWidth = vp.width;
+    refPageHeight = vp.height;
+
+    // 모든 wrapper의 높이 갱신 (width는 flex 가운데 정렬을 위해 설정하지 않음)
+    const wrappers = continuousContainer.querySelectorAll('[data-page]');
+    for (const w of wrappers) {
+        w.style.height = cssH;
+        const canvas = w.querySelector('canvas');
+        if (canvas) {
+            canvas.style.width = cssW;
+            canvas.style.height = cssH;
+        }
+    }
+
+    // 이미 렌더된 페이지만 다시 렌더링
+    const toReRender = [...renderedPages];
+    renderedPages.clear();
+    pageRenderQueue = [];
+    activePageRenders = 0;
+
+    for (const pageNum of toReRender) {
+        const wrapper = continuousContainer.querySelector('[data-page="' + pageNum + '"]');
+        if (wrapper) {
+            renderedPages.add(pageNum);
+            enqueuePageRender(wrapper, pageNum);
+        }
     }
 }
 
@@ -260,9 +310,11 @@ async function renderAllPages(targetPage) {
 
     pageLabel.textContent = '/ ' + totalPages;
 
-    // Observer 정리
+    // 이전 상태 정리
     if (pageObserver) pageObserver.disconnect();
     renderedPages.clear();
+    pageRenderQueue = [];
+    activePageRenders = 0;
 
     // scroll 리스너 제거 후 컨텐츠 초기화 (currentPage 오염 방지)
     continuousContainer.removeEventListener('scroll', trackPageOnScroll);
@@ -270,34 +322,32 @@ async function renderAllPages(targetPage) {
 
     const scale = zoomLevel / 100;
 
-    // 1단계: 첫 페이지에서 기준 크기 확보 (1회만)
+    // 1단계: 첫 페이지에서 기준 CSS 크기 확보 (1회만)
     const firstPage = await pdfDoc.getPage(1);
     const refViewport = firstPage.getViewport({ scale: scale * window.devicePixelRatio });
+    refPageWidth = refViewport.width;
+    refPageHeight = refViewport.height;
+    const cssW = (refViewport.width / window.devicePixelRatio) + 'px';
+    const cssH = (refViewport.height / window.devicePixelRatio) + 'px';
 
-    // 2단계: 모든 wrapper+canvas를 기준 크기로 즉시 생성 (async 불필요)
+    // 2단계: 경량 placeholder div만 생성 (canvas 없음 — 메모리 절약)
+    // width는 설정하지 않음 → flex justify-content:center가 canvas를 가운데 정렬
     for (let i = 0; i < totalPages; i++) {
         const wrapper = document.createElement('div');
         wrapper.className = 'pdf-page-wrapper';
         wrapper.dataset.page = i + 1;
-
-        const canvas = document.createElement('canvas');
-        canvas.className = 'pdf-canvas';
-        canvas.width = refViewport.width;
-        canvas.height = refViewport.height;
-        canvas.style.width = (refViewport.width / window.devicePixelRatio) + 'px';
-        canvas.style.height = (refViewport.height / window.devicePixelRatio) + 'px';
-
-        wrapper.appendChild(canvas);
+        wrapper.style.height = cssH;
         continuousContainer.appendChild(wrapper);
     }
 
-    // 3단계: 레이아웃 완료 → 대상 페이지로 즉시 스크롤
-    if (scrollTarget > 1) {
-        const wrapper = continuousContainer.querySelector('[data-page="' + scrollTarget + '"]');
-        if (wrapper) {
-            continuousContainer.scrollTop = wrapper.offsetTop;
-        }
+    // 3단계: 대상 페이지로 스크롤 → 우선 렌더링
+    const targetWrapper = continuousContainer.querySelector('[data-page="' + scrollTarget + '"]');
+    if (targetWrapper) {
+        continuousContainer.scrollTop = targetWrapper.offsetTop;
+        renderedPages.add(scrollTarget);
+        await renderPageAndWait(targetWrapper, scrollTarget);
     }
+
     currentPage = scrollTarget;
     pageInput.value = scrollTarget;
 
@@ -309,7 +359,7 @@ async function renderAllPages(targetPage) {
     hideLoading();
     continuousContainer.addEventListener('scroll', trackPageOnScroll);
 
-    // 5단계: IntersectionObserver로 보이는 페이지만 렌더링
+    // 5단계: IntersectionObserver로 나머지 페이지 레이지 렌더링
     pageObserver = new IntersectionObserver(handlePageIntersect, {
         root: continuousContainer,
         rootMargin: '200px 0px',
@@ -319,12 +369,61 @@ async function renderAllPages(targetPage) {
 }
 
 function handlePageIntersect(entries) {
+    // 새로 보이는 페이지 수집
+    const newPages = [];
     for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         const pageNum = parseInt(entry.target.dataset.page, 10);
         if (renderedPages.has(pageNum)) continue;
         renderedPages.add(pageNum);
-        renderLazyPage(entry.target, pageNum);
+        newPages.push({ wrapper: entry.target, pageNum });
+    }
+    if (newPages.length === 0) return;
+
+    // 대기 큐 초기화 → 스크롤로 지나간 페이지 렌더링 취소, 현재 보이는 페이지 우선
+    pageRenderQueue = [];
+    for (const { wrapper, pageNum } of newPages) {
+        enqueuePageRender(wrapper, pageNum);
+    }
+}
+
+function enqueuePageRender(wrapper, pageNum) {
+    pageRenderQueue.push({ wrapper, pageNum });
+    processPageRenderQueue();
+}
+
+function processPageRenderQueue() {
+    while (activePageRenders < MAX_CONCURRENT_PAGE_RENDERS && pageRenderQueue.length > 0) {
+        const { wrapper, pageNum } = pageRenderQueue.shift();
+        activePageRenders++;
+        renderLazyPage(wrapper, pageNum).then(() => {
+            activePageRenders--;
+            processPageRenderQueue();
+        });
+    }
+}
+
+/**
+ * 대상 페이지를 렌더링하고 완료까지 대기 (모드 전환 시 정확한 위치 설정용)
+ */
+async function renderPageAndWait(wrapper, pageNum) {
+    try {
+        const page = await pdfDoc.getPage(pageNum);
+        const scale = zoomLevel / 100;
+        const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'pdf-canvas';
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = (viewport.width / window.devicePixelRatio) + 'px';
+        canvas.style.height = (viewport.height / window.devicePixelRatio) + 'px';
+        wrapper.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+    } catch {
+        // 렌더링 실패
     }
 }
 
@@ -333,7 +432,14 @@ async function renderLazyPage(wrapper, pageNum) {
         const page = await pdfDoc.getPage(pageNum);
         const scale = zoomLevel / 100;
         const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
-        const canvas = wrapper.querySelector('canvas');
+
+        // canvas가 아직 없으면 온디맨드 생성
+        let canvas = wrapper.querySelector('canvas');
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.className = 'pdf-canvas';
+            wrapper.appendChild(canvas);
+        }
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -399,6 +505,8 @@ export function hide() {
 
 export function clear() {
     if (pageObserver) { pageObserver.disconnect(); pageObserver = null; }
+    pageRenderQueue = [];
+    activePageRenders = 0;
     renderedPages.clear();
     currentFileId = null;
     currentFilePath = null;
