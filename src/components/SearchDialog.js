@@ -202,6 +202,10 @@ async function replaceAll() {
     const replacement = replaceInput.value;
     const caseSensitive = caseSensitiveCheckbox.checked;
 
+    // 처리 중 표시
+    btnReplaceAll.disabled = true;
+    searchCount.textContent = '교체 중...';
+
     try {
         const count = await invoke('replace_all_text', {
             fileId: currentFileId,
@@ -210,13 +214,15 @@ async function replaceAll() {
             caseSensitive: caseSensitive
         });
 
-        searchCount.textContent = count + '\uAC1C \uAD50\uCCB4\uB428';
+        searchCount.textContent = count + '개 교체됨';
         matches = [];
         currentMatchIndex = -1;
 
         if (onReplace) onReplace(currentFileId);
         if (onMatchesUpdate) onMatchesUpdate([], -1);
     } catch {
-        // 모두 바꾸기 실패
+        searchCount.textContent = '교체 실패';
+    } finally {
+        btnReplaceAll.disabled = false;
     }
 }

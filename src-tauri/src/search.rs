@@ -124,6 +124,7 @@ pub fn replace_next(
 
 /// Replace all occurrences of query in the Rope.
 /// Returns the number of replacements made.
+/// String 기반 일괄 치환으로 O(n) 성능.
 pub fn replace_all_in_rope(
     rope: &mut Rope,
     query: &str,
@@ -134,38 +135,43 @@ pub fn replace_all_in_rope(
         return 0;
     }
 
-    let mut count = 0;
-    let mut from_pos = 0;
+    let text = rope.to_string();
+    let search_query = if case_sensitive {
+        query.to_string()
+    } else {
+        query.to_lowercase()
+    };
 
-    loop {
-        let text = rope.to_string();
-        let search_text;
-        let search_query;
+    // 매칭 위치를 한 번에 수집
+    let search_text = if case_sensitive {
+        text.clone()
+    } else {
+        text.to_lowercase()
+    };
 
-        if case_sensitive {
-            search_text = text.clone();
-            search_query = query.to_string();
-        } else {
-            search_text = text.to_lowercase();
-            search_query = query.to_lowercase();
-        };
-
-        let byte_start: usize = text.chars().take(from_pos).map(|c| c.len_utf8()).sum();
-
-        if let Some(byte_pos) = search_text[byte_start..].find(&search_query) {
-            let abs_byte_pos = byte_start + byte_pos;
-            let char_start = text[..abs_byte_pos].chars().count();
-            let char_end = char_start + query.chars().count();
-
-            rope.remove(char_start..char_end);
-            rope.insert(char_start, replacement);
-
-            from_pos = char_start + replacement.chars().count();
-            count += 1;
-        } else {
-            break;
-        }
+    let mut match_positions = Vec::new();
+    let mut byte_start = 0;
+    while let Some(byte_pos) = search_text[byte_start..].find(&search_query) {
+        let abs_byte_pos = byte_start + byte_pos;
+        match_positions.push(abs_byte_pos);
+        byte_start = abs_byte_pos + query.len();
     }
 
+    let count = match_positions.len();
+    if count == 0 {
+        return 0;
+    }
+
+    // String 상에서 한 번에 조립
+    let mut result = String::with_capacity(text.len());
+    let mut last_end = 0;
+    for &pos in &match_positions {
+        result.push_str(&text[last_end..pos]);
+        result.push_str(replacement);
+        last_end = pos + query.len();
+    }
+    result.push_str(&text[last_end..]);
+
+    *rope = Rope::from_str(&result);
     count
 }
