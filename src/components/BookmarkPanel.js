@@ -117,6 +117,7 @@ function renderFileList() {
     filtered.forEach((entry) => {
         const item = document.createElement('div');
         item.className = 'file-list-item';
+        item.title = entry.file_path;
         if (entry.file_path === currentFilePath) {
             item.classList.add('active');
         }
@@ -474,6 +475,8 @@ function createBookmarkItem(bookmark, index, showFile, fileName) {
 // ============================================================
 
 export function togglePanel() {
+    // 리사이즈로 설정된 인라인 width를 제거해야 CSS 클래스가 적용됨
+    panel.style.width = '';
     panel.classList.toggle('collapsed');
 }
 
@@ -482,6 +485,7 @@ export function isCollapsed() {
 }
 
 export function setCollapsed(collapsed) {
+    panel.style.width = '';
     if (collapsed) {
         panel.classList.add('collapsed');
     } else {

@@ -1020,6 +1020,12 @@ html, body {
     display: none;
 }
 
+/* Ctrl+A 전체 선택 시각적 표시 */
+.all-selected .editor-line .line-content {
+    background: var(--selection-bg, Highlight);
+    color: var(--selection-fg, HighlightText);
+}
+
 .line-content {
     flex: 1;
     white-space: pre;
@@ -1349,6 +1355,13 @@ html, body {
 
 .setting-group:last-child {
     margin-bottom: 0;
+}
+
+.setting-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin: -8px 0 12px 0;
+    opacity: 0.8;
 }
 
 .setting-label {
