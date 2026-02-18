@@ -132,3 +132,24 @@ pub async fn save_last_position(
         .save_last_position(&file_path, position, scroll_offset.unwrap_or(0))
         .map_err(|e| e.to_string())
 }
+
+#[command]
+pub async fn save_format_type(
+    file_path: String,
+    format_type: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .save_format_type(&file_path, format_type)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn get_format_type(
+    file_path: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    Ok(store.get_format_type(&file_path))
+}

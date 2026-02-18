@@ -21,6 +21,8 @@ pub struct FileBookmarks {
     pub last_scroll_offset: usize,
     #[serde(default)]
     pub display_order: Option<usize>,
+    #[serde(default)]
+    pub format_type: Option<String>,
 }
 
 impl Default for FileBookmarks {
@@ -32,6 +34,7 @@ impl Default for FileBookmarks {
             favorite: false,
             last_scroll_offset: 0,
             display_order: None,
+            format_type: None,
         }
     }
 }
@@ -264,5 +267,17 @@ impl BookmarkStore {
         self.data.remove(file_path);
         self.save_to_disk()?;
         Ok(())
+    }
+
+    /// Save the format type for a file.
+    pub fn save_format_type(&mut self, file_path: &str, format_type: Option<String>) -> anyhow::Result<()> {
+        let entry = self.data.entry(file_path.to_string()).or_default();
+        entry.format_type = format_type;
+        self.save_to_disk()
+    }
+
+    /// Get the saved format type for a file.
+    pub fn get_format_type(&self, file_path: &str) -> Option<String> {
+        self.data.get(file_path).and_then(|e| e.format_type.clone())
     }
 }

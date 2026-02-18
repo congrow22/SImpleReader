@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 let currentFileId = null;
+let currentFilePath = null;
 let selectedFormat = null;
 let onFormatApplied = null;
 
@@ -39,8 +40,9 @@ export function init(options = {}) {
     });
 }
 
-export function show(fileId) {
+export function show(fileId, filePath) {
     currentFileId = fileId;
+    currentFilePath = filePath || null;
     selectedFormat = null;
 
     formatButtons.forEach(btn => btn.classList.remove('selected'));
@@ -92,6 +94,16 @@ async function applyFormat() {
             fileId: currentFileId,
             formatType: selectedFormat
         });
+
+        // 선택한 포맷 타입을 파일별로 저장
+        if (currentFilePath) {
+            try {
+                await invoke('save_format_type', {
+                    filePath: currentFilePath,
+                    formatType: selectedFormat
+                });
+            } catch { /* non-critical */ }
+        }
 
         if (onFormatApplied) onFormatApplied();
         hide();
