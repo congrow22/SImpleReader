@@ -1,5 +1,7 @@
 use ropey::Rope;
 use std::path::Path;
+use chardetng::EncodingDetector;
+use encoding_rs::Encoding;
 
 #[derive(Debug, Clone)]
 pub enum EditOperation {
@@ -19,8 +21,39 @@ pub struct TextBuffer {
 
 impl TextBuffer {
     /// Create a new TextBuffer by loading a file from disk.
+    /// 인코딩을 자동 감지하여 UTF-8로 변환합니다 (CP949, Shift_JIS, Big5 등 지원).
     pub fn from_file(path: &Path) -> anyhow::Result<Self> {
-        let rope = Rope::from_reader(std::io::BufReader::new(std::fs::File::open(path)?))?;
+        let raw_bytes = std::fs::read(path)?;
+
+        // UTF-8 BOM 체크
+        let bytes = if raw_bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+            &raw_bytes[3..]
+        } else {
+            &raw_bytes
+        };
+
+        // UTF-8로 먼저 시도
+        let text = match std::str::from_utf8(bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => {
+                // 자동 인코딩 감지
+                let mut detector = EncodingDetector::new();
+                detector.feed(bytes, true);
+                let encoding = detector.guess(None, true);
+                let (decoded, _, had_errors) = encoding.decode(bytes);
+                if had_errors {
+                    // 최후 수단: 손실 허용하여 디코딩
+                    let (decoded, _, _) = Encoding::for_label(b"euc-kr")
+                        .unwrap_or(encoding_rs::WINDOWS_1252)
+                        .decode(bytes);
+                    decoded.into_owned()
+                } else {
+                    decoded.into_owned()
+                }
+            }
+        };
+
+        let rope = Rope::from_str(&text);
         Ok(Self {
             rope,
             undo_stack: Vec::new(),

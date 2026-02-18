@@ -30,6 +30,10 @@ log = "0.4"
 # 대용량 텍스트 처리
 ropey = "1"
 
+# 인코딩 자동 감지/변환
+encoding_rs = "0.8"
+chardetng = "0.1"
+
 # 에러 처리
 anyhow = "1"
 thiserror = "1"
@@ -47,9 +51,10 @@ regex = "1"
 sha1 = "0.10"
 zip = "2"
 
-# Windows 레지스트리
+# Windows 전용
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging"] }
 
 # 고유 ID
 uuid = { version = "1", features = ["v4"] }
