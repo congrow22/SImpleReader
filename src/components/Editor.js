@@ -36,9 +36,15 @@ const spacerBottom = document.getElementById('editor-spacer-bottom');
 const welcome = document.getElementById('editor-welcome');
 
 // Buffer lines above and below viewport
-const BUFFER_LINES = 50;
+const BUFFER_LINES = 150;
+// Chunk alignment size (cache hit 향상)
+const CHUNK_ALIGN = 100;
+// 렌더 범위 가장자리 접근 시 재렌더 트리거 마진
+const RERENDER_MARGIN = 50;
 // Maximum virtual scroll height to avoid browser CSS height limits (~33M px)
 const MAX_SCROLL_HEIGHT = 15_000_000;
+// 스크롤 방향 추적
+let lastScrollTop = 0;
 
 export function init(options = {}) {
     onModified = options.onModified || null;
@@ -196,16 +202,35 @@ async function renderVisibleLines(force = false) {
     const firstVisible = Math.floor(scrollTop / (lineHeight * ratio));
     const visibleCount = Math.ceil(viewportHeight / lineHeight);
 
-    const startLine = Math.max(0, firstVisible - BUFFER_LINES);
-    const endLine = Math.min(totalLines, firstVisible + visibleCount + BUFFER_LINES);
-
     const newCurrentLine = firstVisible + 1;
     if (newCurrentLine !== currentLine) {
         currentLine = newCurrentLine;
         if (onLineChange) onLineChange(currentLine, totalLines);
     }
 
-    if (!force && startLine >= renderedStartLine && endLine <= renderedEndLine) {
+    // 마진 기반 재렌더: 뷰포트가 렌더 범위 가장자리에 접근할 때만 재렌더
+    if (!force && renderedStartLine >= 0) {
+        const topMargin = firstVisible - renderedStartLine;
+        const bottomMargin = renderedEndLine - (firstVisible + visibleCount);
+        if (topMargin >= RERENDER_MARGIN && bottomMargin >= RERENDER_MARGIN) {
+            lastScrollTop = scrollTop;
+            return;
+        }
+    }
+
+    // 스크롤 방향 감지하여 해당 방향에 더 많은 버퍼
+    const scrollingDown = scrollTop >= lastScrollTop;
+    lastScrollTop = scrollTop;
+    const bufferAbove = scrollingDown ? BUFFER_LINES / 3 | 0 : BUFFER_LINES;
+    const bufferBelow = scrollingDown ? BUFFER_LINES : BUFFER_LINES / 3 | 0;
+
+    // CHUNK_ALIGN 단위로 정렬하여 캐시 히트율 향상
+    const rawStart = Math.max(0, firstVisible - bufferAbove);
+    const rawEnd = Math.min(totalLines, firstVisible + visibleCount + bufferBelow);
+    const startLine = Math.floor(rawStart / CHUNK_ALIGN) * CHUNK_ALIGN;
+    const endLine = Math.min(totalLines, Math.ceil(rawEnd / CHUNK_ALIGN) * CHUNK_ALIGN);
+
+    if (!force && startLine === renderedStartLine && endLine === renderedEndLine) {
         return;
     }
 
@@ -223,6 +248,17 @@ async function renderVisibleLines(force = false) {
 
         renderedStartLine = startLine;
         renderedEndLine = endLine;
+
+        // 스크롤 방향으로 다음 청크 프리페치
+        const prefetchStart = scrollingDown
+            ? endLine
+            : Math.max(0, startLine - CHUNK_ALIGN);
+        const prefetchEnd = scrollingDown
+            ? Math.min(totalLines, endLine + CHUNK_ALIGN)
+            : startLine;
+        if (prefetchStart < prefetchEnd) {
+            getChunk(prefetchStart, prefetchEnd);
+        }
 
         // 검색 결과 스크롤 보정: 줄 바꿈(wrapping)으로 인한 위치 오차 보정
         // 렌더링 후 실제 DOM 위치 기반으로 정확히 중앙 정렬하고,
@@ -258,7 +294,7 @@ async function getChunk(startLine, endLine) {
             endLine: endLine
         });
 
-        if (cachedChunks.size > 10) {
+        if (cachedChunks.size > 30) {
             const firstKey = cachedChunks.keys().next().value;
             cachedChunks.delete(firstKey);
         }
