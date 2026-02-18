@@ -76,35 +76,38 @@ pub fn get_system_fonts() -> Result<Vec<String>, String> {
     {
         use std::collections::BTreeSet;
 
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        let fonts_key = hklm
-            .open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
-            .map_err(|e| format!("Failed to open fonts registry: {}", e))?;
-
         let mut font_names = BTreeSet::new();
 
-        for (name, _value) in fonts_key.enum_values().filter_map(|r| r.ok()) {
-            // Registry entries look like "Arial (TrueType)" or "Arial Bold (TrueType)"
-            // Extract the font family name before the parentheses
-            if let Some(paren_pos) = name.rfind('(') {
-                let family = name[..paren_pos].trim();
-                // Skip variants like "Bold", "Italic", "Light" etc.
-                // Keep only base family names
-                let base = family
-                    .trim_end_matches(" Bold")
-                    .trim_end_matches(" Italic")
-                    .trim_end_matches(" Bold Italic")
-                    .trim_end_matches(" Light")
-                    .trim_end_matches(" Medium")
-                    .trim_end_matches(" Thin")
-                    .trim_end_matches(" SemiBold")
-                    .trim_end_matches(" ExtraBold")
-                    .trim_end_matches(" ExtraLight")
-                    .trim_end_matches(" Black")
-                    .trim_end_matches(" Regular")
-                    .trim();
-                if !base.is_empty() {
-                    font_names.insert(base.to_string());
+        // HKLM (시스템 전체 폰트) + HKCU (사용자 설치 폰트: Microsoft Store 등)
+        let registry_paths = [
+            (HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"),
+            (HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"),
+        ];
+
+        for (root, path) in &registry_paths {
+            let root_key = RegKey::predef(*root);
+            if let Ok(fonts_key) = root_key.open_subkey(path) {
+                for (name, _value) in fonts_key.enum_values().filter_map(|r| r.ok()) {
+                    // Registry entries look like "Arial (TrueType)" or "Arial Bold (TrueType)"
+                    if let Some(paren_pos) = name.rfind('(') {
+                        let family = name[..paren_pos].trim();
+                        let base = family
+                            .trim_end_matches(" Bold")
+                            .trim_end_matches(" Italic")
+                            .trim_end_matches(" Bold Italic")
+                            .trim_end_matches(" Light")
+                            .trim_end_matches(" Medium")
+                            .trim_end_matches(" Thin")
+                            .trim_end_matches(" SemiBold")
+                            .trim_end_matches(" ExtraBold")
+                            .trim_end_matches(" ExtraLight")
+                            .trim_end_matches(" Black")
+                            .trim_end_matches(" Regular")
+                            .trim();
+                        if !base.is_empty() {
+                            font_names.insert(base.to_string());
+                        }
+                    }
                 }
             }
         }
