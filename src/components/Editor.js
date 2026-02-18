@@ -25,7 +25,8 @@ let onLineChange = null;
 let onEditModeChange = null;
 let editMode = false;
 let pendingScrollToMatch = false;
-let suppressScrollRender = false;
+let isRendering = false;
+let pendingRender = false;
 
 // DOM elements
 const container = document.getElementById('editor-container');
@@ -171,10 +172,6 @@ function updateScrollHeight() {
 }
 
 function onScroll() {
-    if (suppressScrollRender) {
-        suppressScrollRender = false;
-        return;
-    }
     if (scrollRAF) return;
     scrollRAF = requestAnimationFrame(async () => {
         scrollRAF = null;
@@ -194,55 +191,72 @@ function scheduleRender() {
 async function renderVisibleLines(force = false) {
     if (!currentFileId || totalLines === 0) return;
 
-    const thisGeneration = renderGeneration;
-    const scrollTop = scrollArea.scrollTop;
-    const viewportHeight = scrollArea.clientHeight;
-    const ratio = getScrollRatio();
-
-    const firstVisible = Math.floor(scrollTop / (lineHeight * ratio));
-    const visibleCount = Math.ceil(viewportHeight / lineHeight);
-
-    const newCurrentLine = firstVisible + 1;
-    if (newCurrentLine !== currentLine) {
-        currentLine = newCurrentLine;
-        if (onLineChange) onLineChange(currentLine, totalLines);
-    }
-
-    // 마진 기반 재렌더: 뷰포트가 렌더 범위 가장자리에 접근할 때만 재렌더
-    if (!force && renderedStartLine >= 0) {
-        const topMargin = firstVisible - renderedStartLine;
-        const bottomMargin = renderedEndLine - (firstVisible + visibleCount);
-        if (topMargin >= RERENDER_MARGIN && bottomMargin >= RERENDER_MARGIN) {
-            lastScrollTop = scrollTop;
-            return;
-        }
-    }
-
-    // 스크롤 방향 감지하여 해당 방향에 더 많은 버퍼
-    const scrollingDown = scrollTop >= lastScrollTop;
-    lastScrollTop = scrollTop;
-    const bufferAbove = scrollingDown ? BUFFER_LINES / 3 | 0 : BUFFER_LINES;
-    const bufferBelow = scrollingDown ? BUFFER_LINES : BUFFER_LINES / 3 | 0;
-
-    // CHUNK_ALIGN 단위로 정렬하여 캐시 히트율 향상
-    const rawStart = Math.max(0, firstVisible - bufferAbove);
-    const rawEnd = Math.min(totalLines, firstVisible + visibleCount + bufferBelow);
-    const startLine = Math.floor(rawStart / CHUNK_ALIGN) * CHUNK_ALIGN;
-    const endLine = Math.min(totalLines, Math.ceil(rawEnd / CHUNK_ALIGN) * CHUNK_ALIGN);
-
-    if (!force && startLine === renderedStartLine && endLine === renderedEndLine) {
+    // 렌더링 동시 실행 방지: 이전 렌더가 진행 중이면 완료 후 재시도
+    if (isRendering) {
+        pendingRender = true;
         return;
     }
+    isRendering = true;
 
     try {
+        const thisGeneration = renderGeneration;
+        const scrollTop = scrollArea.scrollTop;
+        const viewportHeight = scrollArea.clientHeight;
+        const ratio = getScrollRatio();
+
+        const firstVisible = Math.floor(scrollTop / (lineHeight * ratio));
+        const visibleCount = Math.ceil(viewportHeight / lineHeight);
+
+        const newCurrentLine = firstVisible + 1;
+        if (newCurrentLine !== currentLine) {
+            currentLine = newCurrentLine;
+            if (onLineChange) onLineChange(currentLine, totalLines);
+        }
+
+        // 마진 기반 재렌더: 뷰포트가 렌더 범위 가장자리에 접근할 때만 재렌더
+        if (!force && renderedStartLine >= 0) {
+            const topMargin = firstVisible - renderedStartLine;
+            const bottomMargin = renderedEndLine - (firstVisible + visibleCount);
+            if (topMargin >= RERENDER_MARGIN && bottomMargin >= RERENDER_MARGIN) {
+                lastScrollTop = scrollTop;
+                return;
+            }
+        }
+
+        // 스크롤 방향 감지하여 해당 방향에 약간 더 많은 버퍼 (급변 방지)
+        const scrollingDown = scrollTop >= lastScrollTop;
+        lastScrollTop = scrollTop;
+        const bufferAbove = scrollingDown ? BUFFER_LINES * 2 / 3 | 0 : BUFFER_LINES;
+        const bufferBelow = scrollingDown ? BUFFER_LINES : BUFFER_LINES * 2 / 3 | 0;
+
+        // CHUNK_ALIGN 단위로 정렬하여 캐시 히트율 향상
+        const rawStart = Math.max(0, firstVisible - bufferAbove);
+        const rawEnd = Math.min(totalLines, firstVisible + visibleCount + bufferBelow);
+        const startLine = Math.floor(rawStart / CHUNK_ALIGN) * CHUNK_ALIGN;
+        const endLine = Math.min(totalLines, Math.ceil(rawEnd / CHUNK_ALIGN) * CHUNK_ALIGN);
+
+        if (!force && startLine === renderedStartLine && endLine === renderedEndLine) {
+            return;
+        }
+
         const chunk = await getChunk(startLine, endLine);
         if (!chunk) return;
 
-        // If a newer render was triggered while we were fetching, skip this stale update
+        // 비동기 대기 중 새 렌더가 예약되었으면 이 결과를 폐기
         if (thisGeneration !== renderGeneration) return;
 
-        spacerTop.style.height = (startLine * lineHeight * ratio) + 'px';
-        spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight * ratio) + 'px';
+        // spacer 높이 설정: ratio<1일 때 scrollTop-anchored 방식으로 총 높이 일정하게 유지
+        const renderedLines = endLine - startLine;
+        const virtualHeight = Math.min(totalLines * lineHeight, MAX_SCROLL_HEIGHT);
+        if (ratio < 1) {
+            // scrollTop 기준으로 spacerTop을 설정하여 현재 보이는 라인이 정확한 위치에 렌더
+            const topHeight = Math.max(0, scrollTop - (firstVisible - startLine) * lineHeight);
+            spacerTop.style.height = topHeight + 'px';
+            spacerBottom.style.height = Math.max(0, virtualHeight - topHeight - renderedLines * lineHeight) + 'px';
+        } else {
+            spacerTop.style.height = (startLine * lineHeight) + 'px';
+            spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight) + 'px';
+        }
 
         renderLines(chunk.lines, startLine);
 
@@ -260,9 +274,7 @@ async function renderVisibleLines(force = false) {
             getChunk(prefetchStart, prefetchEnd);
         }
 
-        // 검색 결과 스크롤 보정: 줄 바꿈(wrapping)으로 인한 위치 오차 보정
-        // 렌더링 후 실제 DOM 위치 기반으로 정확히 중앙 정렬하고,
-        // 보정으로 인한 재렌더링을 1회 억제하여 위치 안정성 확보
+        // 검색 결과 스크롤 보정: 렌더링 후 실제 DOM 위치 기반으로 중앙 정렬
         if (pendingScrollToMatch) {
             pendingScrollToMatch = false;
             const activeEl = linesContainer.querySelector('.search-match-active');
@@ -271,13 +283,18 @@ async function renderVisibleLines(force = false) {
                 const scrollRect = scrollArea.getBoundingClientRect();
                 const offset = (elRect.top + elRect.height / 2) - (scrollRect.top + scrollRect.height / 2);
                 if (Math.abs(offset) > 2) {
-                    suppressScrollRender = true;
                     scrollArea.scrollTop += offset;
                 }
             }
         }
     } catch {
         // 렌더링 실패
+    } finally {
+        isRendering = false;
+        if (pendingRender) {
+            pendingRender = false;
+            scheduleRender();
+        }
     }
 }
 
