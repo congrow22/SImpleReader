@@ -37,7 +37,22 @@ pub fn run() {
             // and open the file passed as argument
             use tauri::Manager;
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
                 let _ = window.set_focus();
+                // Windows: SetForegroundWindow로 확실하게 전면 표시
+                #[cfg(target_os = "windows")]
+                {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::{
+                        SetForegroundWindow, ShowWindow, SW_RESTORE,
+                    };
+                    if let Ok(hwnd) = window.hwnd() {
+                        unsafe {
+                            ShowWindow(hwnd.0 as _, SW_RESTORE);
+                            SetForegroundWindow(hwnd.0 as _);
+                        }
+                    }
+                }
             }
             if args.len() > 1 {
                 let file_path = args[1].clone();
@@ -85,6 +100,7 @@ pub fn run() {
             commands::get_open_tabs,
             commands::switch_tab,
             commands::get_total_lines,
+            commands::get_full_text,
             // Edit commands
             commands::insert_text,
             commands::replace_line,
@@ -104,6 +120,8 @@ pub fn run() {
             commands::toggle_favorite,
             commands::reorder_file_list,
             commands::move_bookmark,
+            commands::save_format_type,
+            commands::get_format_type,
             // Search commands
             commands::search_text,
             commands::replace_text,

@@ -89,6 +89,18 @@ pub async fn switch_tab(
 }
 
 #[command]
+pub async fn get_full_text(
+    file_id: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
+    let buffer = tab_manager
+        .get_buffer(&file_id)
+        .map_err(|e| e.to_string())?;
+    Ok(buffer.to_string_full())
+}
+
+#[command]
 pub async fn get_total_lines(
     file_id: String,
     state: tauri::State<'_, AppState>,

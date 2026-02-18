@@ -250,6 +250,8 @@ function initFormatDialog() {
         onFormatApplied: () => {
             Editor.refreshContent();
             if (state.activeFileId) {
+                const info = state.files.get(state.activeFileId);
+                if (info) info.is_modified = true;
                 TabBar.updateTab(state.activeFileId, { is_modified: true });
             }
             updateStatusBar();
@@ -311,9 +313,23 @@ function initWelcome() {
 // ============================================================
 
 function initKeyboardShortcuts() {
+    // Ctrl+A 전체 선택: 클릭 시 해제
+    document.addEventListener('mousedown', () => {
+        if (window.__allSelected) {
+            window.__allSelected = false;
+            window.__fullText = null;
+            document.getElementById('editor-lines')?.classList.remove('all-selected');
+        }
+    });
+
     document.addEventListener('keydown', (e) => {
         const ctrl = e.ctrlKey || e.metaKey;
         const shift = e.shiftKey;
+
+        // Ctrl+A/C 외의 키 입력 시 전체 선택 해제
+        if (window.__allSelected && !(ctrl && (e.key === 'c' || e.key === 'a'))) {
+            window.__allSelected = false;
+        }
 
         // Ctrl+O: Open file
         if (ctrl && !shift && e.key === 'o') {
@@ -408,11 +424,41 @@ function initKeyboardShortcuts() {
         // Ctrl+Shift+F: Text formatting
         if (ctrl && shift && e.key === 'F') {
             e.preventDefault();
+            if (EpubViewer.isVisible() || PdfViewer.isVisible()) {
+                alert('텍스트 정리는 텍스트 파일에서만 사용할 수 있습니다.');
+                return;
+            }
             const fileId = Editor.getCurrentFileId();
             if (fileId) {
-                FormatDialog.show(fileId);
+                FormatDialog.show(fileId, Editor.getCurrentFilePath());
             }
             return;
+        }
+
+        // Ctrl+A: 전체 선택 (미리 텍스트 캐시 + CSS로 시각적 선택 표시)
+        if (ctrl && !shift && e.key === 'a') {
+            const fileId = Editor.getCurrentFileId();
+            if (fileId) {
+                e.preventDefault();
+                window.__allSelected = true;
+                window.__fullText = null;
+                const linesEl = document.getElementById('editor-lines');
+                if (linesEl) linesEl.classList.add('all-selected');
+                // 백그라운드에서 전체 텍스트를 미리 가져옴
+                invoke('get_full_text', { fileId }).then(text => {
+                    window.__fullText = text;
+                }).catch(() => {});
+                return;
+            }
+        }
+
+        // Ctrl+C: 전체 선택 상태면 캐시된 텍스트를 클립보드에 복사
+        if (ctrl && !shift && e.key === 'c') {
+            if (window.__allSelected && window.__fullText) {
+                e.preventDefault();
+                navigator.clipboard.writeText(window.__fullText).catch(() => {});
+                return;
+            }
         }
 
         // F2: Toggle edit mode
@@ -537,8 +583,12 @@ function handleMenuAction(action) {
             SearchDialog.setFileId(Editor.getCurrentFileId());
             break;
         case 'format': {
+            if (EpubViewer.isVisible() || PdfViewer.isVisible()) {
+                alert('텍스트 정리는 텍스트 파일에서만 사용할 수 있습니다.');
+                break;
+            }
             const fileId = Editor.getCurrentFileId();
-            if (fileId) FormatDialog.show(fileId);
+            if (fileId) FormatDialog.show(fileId, Editor.getCurrentFilePath());
             break;
         }
         case 'goto-line':
@@ -655,6 +705,18 @@ async function openFile(path) {
             document.getElementById('editor-container').classList.remove('hidden');
             await Editor.loadFile(fileInfo);
             SearchDialog.setFileId(fileInfo.id);
+
+            // 저장된 텍스트 정리 옵션이 있으면 자동 적용
+            try {
+                const savedFormat = await invoke('get_format_type', { filePath: fileInfo.path });
+                if (savedFormat) {
+                    await invoke('apply_format', {
+                        fileId: fileInfo.id,
+                        formatType: savedFormat
+                    });
+                    await Editor.refreshContent();
+                }
+            } catch { /* non-critical */ }
         }
 
         BookmarkPanel.loadBookmarks(fileInfo.path, fileInfo.file_type);
@@ -788,6 +850,18 @@ async function showFileByType(fileInfo, fileId) {
         document.getElementById('editor-container').classList.remove('hidden');
         await Editor.loadFile(fileInfo);
         SearchDialog.setFileId(fileId);
+
+        // 저장된 텍스트 정리 옵션이 있으면 자동 적용
+        try {
+            const savedFormat = await invoke('get_format_type', { filePath: fileInfo.path });
+            if (savedFormat) {
+                await invoke('apply_format', {
+                    fileId: fileInfo.id,
+                    formatType: savedFormat
+                });
+                await Editor.refreshContent();
+            }
+        } catch { /* non-critical */ }
     }
 
     BookmarkPanel.loadBookmarks(fileInfo.path, fileInfo.file_type);
