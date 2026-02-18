@@ -27,6 +27,7 @@ let editMode = false;
 let pendingScrollToMatch = false;
 let isRendering = false;
 let pendingRender = false;
+let renderSuppressed = false;
 
 // DOM elements
 const container = document.getElementById('editor-container');
@@ -57,6 +58,7 @@ export function init(options = {}) {
     calculateLineHeight();
 
     window.addEventListener('resize', () => {
+        if (renderSuppressed) return;
         calculateLineHeight();
         if (currentFileId) {
             scheduleRender();
@@ -154,6 +156,56 @@ export function getCurrentLine() {
     return Math.max(1, Math.min(centerLine, totalLines));
 }
 
+export function getFirstVisibleLine() {
+    if (!currentFileId || totalLines === 0) return 1;
+
+    // DOM 기반: 실제 뷰포트 맨 위에 보이는 줄을 찾음 (word wrap 대응)
+    const scrollRect = scrollArea.getBoundingClientRect();
+    const children = linesContainer.children;
+    for (let i = 0; i < children.length; i++) {
+        const rect = children[i].getBoundingClientRect();
+        if (rect.bottom > scrollRect.top) {
+            return renderedStartLine + i + 1; // 1-based
+        }
+    }
+
+    // 폴백: 이론적 계산
+    const ratio = getScrollRatio();
+    const line = Math.floor(scrollArea.scrollTop / (lineHeight * ratio)) + 1;
+    return Math.max(1, Math.min(line, totalLines));
+}
+
+export function scrollToLineTop(lineNumber) {
+    if (lineNumber < 1 || lineNumber > totalLines) return;
+    const ratio = getScrollRatio();
+    scrollArea.scrollTop = (lineNumber - 1) * lineHeight * ratio;
+}
+
+export function suppressRender(suppress) {
+    renderSuppressed = suppress;
+}
+
+export async function recalculateAndScrollTo(lineNumber) {
+    calculateLineHeight();
+    updateScrollHeight();
+    const ratio = getScrollRatio();
+    scrollArea.scrollTop = (lineNumber - 1) * lineHeight * ratio;
+    renderGeneration++;
+    await renderVisibleLines(true);
+
+    // DOM 기반 미세 보정: 렌더 후 실제 줄 위치로 정확히 스크롤 (word wrap 대응)
+    const targetIdx = lineNumber - 1 - renderedStartLine;
+    if (targetIdx >= 0 && targetIdx < linesContainer.children.length) {
+        const lineEl = linesContainer.children[targetIdx];
+        const lineRect = lineEl.getBoundingClientRect();
+        const scrollRect = scrollArea.getBoundingClientRect();
+        const offset = lineRect.top - scrollRect.top;
+        if (Math.abs(offset) > 1) {
+            scrollArea.scrollTop += offset;
+        }
+    }
+}
+
 export function getTotalLines() {
     return totalLines;
 }
@@ -180,6 +232,7 @@ function onScroll() {
 }
 
 function scheduleRender() {
+    if (renderSuppressed) return;
     if (scrollRAF) cancelAnimationFrame(scrollRAF);
     renderGeneration++; // Invalidate any in-flight async renders immediately
     scrollRAF = requestAnimationFrame(async () => {
@@ -246,17 +299,13 @@ async function renderVisibleLines(force = false) {
         if (thisGeneration !== renderGeneration) return;
 
         // spacer 높이 설정: ratio<1일 때 scrollTop-anchored 방식으로 총 높이 일정하게 유지
+        // scrollTop 앵커링: 현재 보이는 라인을 항상 정확한 위치에 고정
+        // 폰트 렌더링 오차가 축적되어도 firstVisible 라인이 scrollTop에 정확히 대응
         const renderedLines = endLine - startLine;
-        const virtualHeight = Math.min(totalLines * lineHeight, MAX_SCROLL_HEIGHT);
-        if (ratio < 1) {
-            // scrollTop 기준으로 spacerTop을 설정하여 현재 보이는 라인이 정확한 위치에 렌더
-            const topHeight = Math.max(0, scrollTop - (firstVisible - startLine) * lineHeight);
-            spacerTop.style.height = topHeight + 'px';
-            spacerBottom.style.height = Math.max(0, virtualHeight - topHeight - renderedLines * lineHeight) + 'px';
-        } else {
-            spacerTop.style.height = (startLine * lineHeight) + 'px';
-            spacerBottom.style.height = (Math.max(0, totalLines - endLine) * lineHeight) + 'px';
-        }
+        const totalVirtualHeight = Math.min(totalLines * lineHeight, MAX_SCROLL_HEIGHT);
+        const topHeight = Math.max(0, scrollTop - (firstVisible - startLine) * lineHeight);
+        spacerTop.style.height = topHeight + 'px';
+        spacerBottom.style.height = Math.max(0, totalVirtualHeight - topHeight - renderedLines * lineHeight) + 'px';
 
         renderLines(chunk.lines, startLine);
 

@@ -977,7 +977,33 @@ function updateEditModeUI(editMode) {
 // ============================================================
 
 function toggleSidebar() {
+    // 사이드바 토글 시 맨 윗줄 기준으로 위치 보존
+    // transition 동안 resize→scheduleRender 체인을 차단하고, 끝난 후 한 번만 복원
+    const topLine = Editor.getFirstVisibleLine();
+
+    Editor.suppressRender(true);
     BookmarkPanel.togglePanel();
+
+    const panel = document.getElementById('bookmark-panel');
+    let restored = false;
+
+    function doRestore() {
+        if (restored) return;
+        restored = true;
+        panel.removeEventListener('transitionend', onTransitionEnd);
+        Editor.suppressRender(false);
+        if (topLine > 0) {
+            Editor.recalculateAndScrollTo(topLine);
+        }
+    }
+
+    function onTransitionEnd(e) {
+        if (e.propertyName === 'width') doRestore();
+    }
+
+    panel.addEventListener('transitionend', onTransitionEnd);
+    setTimeout(doRestore, 400); // 안전장치: transitionend가 안 오면 강제 복원
+
     const reopenBtn = document.getElementById('btn-reopen-sidebar');
     if (reopenBtn) {
         reopenBtn.classList.toggle('hidden', !BookmarkPanel.isCollapsed());
