@@ -147,12 +147,22 @@ export function getCurrentFilePath() {
 }
 
 export function getCurrentLine() {
-    // 스크롤 위치에서 직접 계산 (뷰포트 중앙 기준)
+    // DOM 기반: 뷰포트 중앙에 보이는 실제 줄을 찾음 (word wrap 대응)
     if (!currentFileId || totalLines === 0) return currentLine;
-    const scrollTop = scrollArea.scrollTop;
-    const viewportHeight = scrollArea.clientHeight;
+
+    const scrollRect = scrollArea.getBoundingClientRect();
+    const centerY = scrollRect.top + scrollRect.height / 2;
+    const children = linesContainer.children;
+    for (let i = 0; i < children.length; i++) {
+        const rect = children[i].getBoundingClientRect();
+        if (rect.bottom > centerY) {
+            return Math.max(1, Math.min(renderedStartLine + i + 1, totalLines));
+        }
+    }
+
+    // 폴백: 이론적 계산
     const ratio = getScrollRatio();
-    const centerLine = Math.floor((scrollTop + viewportHeight / 2) / (lineHeight * ratio)) + 1;
+    const centerLine = Math.floor((scrollArea.scrollTop + scrollArea.clientHeight / 2) / (lineHeight * ratio)) + 1;
     return Math.max(1, Math.min(centerLine, totalLines));
 }
 
@@ -188,12 +198,17 @@ export function suppressRender(suppress) {
 export async function recalculateAndScrollTo(lineNumber) {
     calculateLineHeight();
     updateScrollHeight();
+
+    // 1단계: 이론적 위치로 이동
     const ratio = getScrollRatio();
     scrollArea.scrollTop = (lineNumber - 1) * lineHeight * ratio;
     renderGeneration++;
     await renderVisibleLines(true);
 
-    // DOM 기반 미세 보정: 렌더 후 실제 줄 위치로 정확히 스크롤 (word wrap 대응)
+    // 2단계: 모든 pending 렌더 소화 대기 (2프레임)
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    // 3단계: DOM 기반 정확한 위치 보정 (상단 고정)
     const targetIdx = lineNumber - 1 - renderedStartLine;
     if (targetIdx >= 0 && targetIdx < linesContainer.children.length) {
         const lineEl = linesContainer.children[targetIdx];
@@ -204,6 +219,9 @@ export async function recalculateAndScrollTo(lineNumber) {
             scrollArea.scrollTop += offset;
         }
     }
+    lastScrollTop = scrollArea.scrollTop;
+    if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; }
+    pendingRender = false;
 }
 
 export function getTotalLines() {
@@ -305,12 +323,34 @@ async function renderVisibleLines(force = false) {
         const totalVirtualHeight = Math.min(totalLines * lineHeight, MAX_SCROLL_HEIGHT);
         const topHeight = Math.max(0, scrollTop - (firstVisible - startLine) * lineHeight);
         spacerTop.style.height = topHeight + 'px';
-        spacerBottom.style.height = Math.max(0, totalVirtualHeight - topHeight - renderedLines * lineHeight) + 'px';
 
         renderLines(chunk.lines, startLine);
 
         renderedStartLine = startLine;
         renderedEndLine = endLine;
+
+        // Word wrap 보정: 일반 스크롤 시에만 적용 (force=true인 scrollToLine 등은 자체 DOM 보정 수행)
+        // spacerTop은 이론적 lineHeight 기반이므로, word wrap된 줄의 실제 높이와 차이가 발생
+        // renderLines() 직후 DOM 실측으로 그 차이를 보정하여 시각적 점프 방지
+        if (!force) {
+            const targetIdx = firstVisible - startLine;
+            if (targetIdx >= 0 && targetIdx < linesContainer.children.length) {
+                const lineEl = linesContainer.children[targetIdx];
+                const lineRect = lineEl.getBoundingClientRect();
+                const scrollRect = scrollArea.getBoundingClientRect();
+                const actualOffset = lineRect.top - scrollRect.top;
+                const subLinePx = scrollTop % (lineHeight * ratio);
+                const correction = actualOffset + subLinePx;
+                if (Math.abs(correction) > 1) {
+                    scrollArea.scrollTop += correction;
+                }
+            }
+        }
+
+        // spacerBottom도 실제 DOM 높이 기반으로 재계산 (word wrap 높이 반영)
+        const actualRenderedHeight = linesContainer.getBoundingClientRect().height;
+        spacerBottom.style.height = Math.max(0,
+            totalVirtualHeight - topHeight - actualRenderedHeight) + 'px';
 
         // 스크롤 방향으로 다음 청크 프리페치
         const prefetchStart = scrollingDown
@@ -525,14 +565,16 @@ export function setSearchMatches(matches, activeIndex = -1) {
     scheduleRender();
 }
 
-export function setActiveMatch(index) {
+export async function setActiveMatch(index) {
     activeMatchIndex = index;
     if (index >= 0 && index < searchMatches.length) {
         const match = searchMatches[index];
-        scrollToLine(match.line + 1);
         pendingScrollToMatch = true;
+        cachedChunks.clear();
+        await scrollToLine(match.line + 1);
+    } else {
+        cachedChunks.clear();
     }
-    cachedChunks.clear();
     scheduleRender();
 }
 
@@ -549,15 +591,36 @@ export function clearSearchHighlights() {
     cachedChunks.clear();
 }
 
-export function scrollToLine(lineNumber) {
+export async function scrollToLine(lineNumber) {
     if (lineNumber < 1 || lineNumber > totalLines) return;
-    const ratio = getScrollRatio();
-    const targetScroll = (lineNumber - 1) * lineHeight * ratio;
-    const viewportHeight = scrollArea.clientHeight;
-    const newScrollTop = targetScroll - (viewportHeight / 2) + (lineHeight / 2);
-    scrollArea.scrollTop = newScrollTop;
     currentLine = lineNumber;
     if (onLineChange) onLineChange(currentLine, totalLines);
+
+    // 1단계: 이론적 위치로 이동하여 대상 줄의 청크 로딩
+    const ratio = getScrollRatio();
+    const viewportHeight = scrollArea.clientHeight;
+    scrollArea.scrollTop = (lineNumber - 1) * lineHeight * ratio - viewportHeight / 2 + lineHeight / 2;
+    renderGeneration++;
+    await renderVisibleLines(true);
+
+    // 2단계: 모든 pending 렌더 소화 대기 (2프레임)
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    // 3단계: DOM에서 대상 줄을 찾아 정확히 중앙 배치
+    const targetIdx = lineNumber - 1 - renderedStartLine;
+    if (targetIdx >= 0 && targetIdx < linesContainer.children.length) {
+        const lineEl = linesContainer.children[targetIdx];
+        const lineRect = lineEl.getBoundingClientRect();
+        const scrollRect = scrollArea.getBoundingClientRect();
+        const offset = (lineRect.top + lineRect.height / 2) - (scrollRect.top + scrollRect.height / 2);
+        if (Math.abs(offset) > 1) {
+            scrollArea.scrollTop += offset;
+        }
+    }
+    lastScrollTop = scrollArea.scrollTop;
+    // 후속 자동 렌더 취소 (DOM 보정이 뒤집히는 것 방지)
+    if (scrollRAF) { cancelAnimationFrame(scrollRAF); scrollRAF = null; }
+    pendingRender = false;
 }
 
 export async function refreshContent() {
