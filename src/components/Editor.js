@@ -275,8 +275,22 @@ async function renderVisibleLines(force = false) {
         const viewportHeight = scrollArea.clientHeight;
         const ratio = getScrollRatio();
 
-        const firstVisible = Math.floor(scrollTop / (lineHeight * ratio));
+        let firstVisible = Math.floor(scrollTop / (lineHeight * ratio)); // 이론적 폴백
         const visibleCount = Math.ceil(viewportHeight / lineHeight);
+
+        // DOM 기반 firstVisible: 일반 스크롤 시에만 적용
+        // force 렌더(scrollToLine, loadFile 등)는 이론적 값 유지하여 명시적 위치 이동 보존
+        // word wrap 시 이론적 계산(scrollTop / lineHeight)은 누적 오차로 부정확해짐
+        if (!force && renderedStartLine >= 0 && linesContainer.children.length > 0) {
+            const scrollRect = scrollArea.getBoundingClientRect();
+            for (let i = 0; i < linesContainer.children.length; i++) {
+                const rect = linesContainer.children[i].getBoundingClientRect();
+                if (rect.bottom > scrollRect.top) {
+                    firstVisible = renderedStartLine + i;
+                    break;
+                }
+            }
+        }
 
         const newCurrentLine = firstVisible + 1;
         if (newCurrentLine !== currentLine) {
