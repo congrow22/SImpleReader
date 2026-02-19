@@ -316,9 +316,16 @@ async function renderVisibleLines(force = false) {
         // 비동기 대기 중 새 렌더가 예약되었으면 이 결과를 폐기
         if (thisGeneration !== renderGeneration) return;
 
-        // spacer 높이 설정: ratio<1일 때 scrollTop-anchored 방식으로 총 높이 일정하게 유지
-        // scrollTop 앵커링: 현재 보이는 라인을 항상 정확한 위치에 고정
-        // 폰트 렌더링 오차가 축적되어도 firstVisible 라인이 scrollTop에 정확히 대응
+        // 앵커 보존: 렌더 전 firstVisible 줄의 화면 위치 기록 (word wrap 점프 방지)
+        let anchorScreenY = null;
+        if (!force && renderedStartLine >= 0) {
+            const anchorIdx = firstVisible - renderedStartLine;
+            if (anchorIdx >= 0 && anchorIdx < linesContainer.children.length) {
+                anchorScreenY = linesContainer.children[anchorIdx].getBoundingClientRect().top;
+            }
+        }
+
+        // spacerTop 이론적 계산 + DOM 렌더
         const renderedLines = endLine - startLine;
         const totalVirtualHeight = Math.min(totalLines * lineHeight, MAX_SCROLL_HEIGHT);
         const topHeight = Math.max(0, scrollTop - (firstVisible - startLine) * lineHeight);
@@ -329,28 +336,36 @@ async function renderVisibleLines(force = false) {
         renderedStartLine = startLine;
         renderedEndLine = endLine;
 
-        // Word wrap 보정: 일반 스크롤 시에만 적용 (force=true인 scrollToLine 등은 자체 DOM 보정 수행)
-        // spacerTop은 이론적 lineHeight 기반이므로, word wrap된 줄의 실제 높이와 차이가 발생
-        // renderLines() 직후 DOM 실측으로 그 차이를 보정하여 시각적 점프 방지
-        if (!force) {
-            const targetIdx = firstVisible - startLine;
-            if (targetIdx >= 0 && targetIdx < linesContainer.children.length) {
-                const lineEl = linesContainer.children[targetIdx];
-                const lineRect = lineEl.getBoundingClientRect();
+        // 앵커 복원: 렌더 후 같은 줄의 새 위치와 비교하여 spacerTop 보정
+        // scrollTop을 건드리지 않으므로 onScroll 미발생, 재렌더 루프 없음
+        if (anchorScreenY !== null) {
+            const newAnchorIdx = firstVisible - startLine;
+            if (newAnchorIdx >= 0 && newAnchorIdx < linesContainer.children.length) {
+                const newScreenY = linesContainer.children[newAnchorIdx].getBoundingClientRect().top;
+                const drift = newScreenY - anchorScreenY;
+                if (Math.abs(drift) > 1) {
+                    spacerTop.style.height = Math.max(0, topHeight - drift) + 'px';
+                }
+            }
+        } else {
+            // 앵커 없음 (렌더 범위 밖으로 스크롤했거나 force 렌더)
+            // DOM 측정으로 firstVisible 줄이 뷰포트 상단에 오도록 spacerTop 보정
+            const visibleIdx = firstVisible - startLine;
+            if (visibleIdx >= 0 && visibleIdx < linesContainer.children.length) {
+                const lineRect = linesContainer.children[visibleIdx].getBoundingClientRect();
                 const scrollRect = scrollArea.getBoundingClientRect();
-                const actualOffset = lineRect.top - scrollRect.top;
-                const subLinePx = scrollTop % (lineHeight * ratio);
-                const correction = actualOffset + subLinePx;
-                if (Math.abs(correction) > 1) {
-                    scrollArea.scrollTop += correction;
+                const drift = lineRect.top - scrollRect.top;
+                if (Math.abs(drift) > 1) {
+                    spacerTop.style.height = Math.max(0, topHeight - drift) + 'px';
                 }
             }
         }
 
-        // spacerBottom도 실제 DOM 높이 기반으로 재계산 (word wrap 높이 반영)
+        // spacerBottom: 보정된 spacerTop 기준으로 계산
         const actualRenderedHeight = linesContainer.getBoundingClientRect().height;
+        const currentTopHeight = parseFloat(spacerTop.style.height) || 0;
         spacerBottom.style.height = Math.max(0,
-            totalVirtualHeight - topHeight - actualRenderedHeight) + 'px';
+            totalVirtualHeight - currentTopHeight - actualRenderedHeight) + 'px';
 
         // 스크롤 방향으로 다음 청크 프리페치
         const prefetchStart = scrollingDown
