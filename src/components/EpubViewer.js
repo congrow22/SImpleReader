@@ -93,6 +93,18 @@ export function init(options = {}) {
 
     // Keyboard navigation on container (when iframe doesn't have focus)
     contentArea.addEventListener('keydown', handleKeydown);
+
+    // wheel 이벤트 직접 처리: iframe 포커스 소실 시 스크롤 멈춤 방지
+    // (커서가 iframe 밖 영역에 있을 때의 fallback)
+    contentArea.addEventListener('wheel', (e) => {
+        if (continuousMode) {
+            continuousContainer.scrollTop += e.deltaY;
+            e.preventDefault();
+        } else if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.scrollBy(0, e.deltaY);
+            e.preventDefault();
+        }
+    }, { passive: false });
 }
 
 function handleKeydown(e) {
@@ -584,6 +596,20 @@ function setupIframeContent(f) {
 
     // Forward keyboard events
     doc.addEventListener('keydown', handleKeydown);
+
+    // wheel 이벤트 명시적 처리: iframe 포커스 소실 시 스크롤 멈춤 방지
+    // Chromium compositor가 비활성화되어 네이티브 스크롤이 멈추는 현상 우회
+    doc.addEventListener('wheel', (e) => {
+        if (continuousMode) {
+            // 연속 모드: iframe은 overflow:hidden이므로 부모 컨테이너 스크롤
+            continuousContainer.scrollTop += e.deltaY;
+            e.preventDefault();
+        } else {
+            // 단일 모드: iframe 내부 document 스크롤
+            f.contentWindow.scrollBy(0, e.deltaY);
+            e.preventDefault();
+        }
+    }, { passive: false });
 
     // Apply zoom
     if (doc.body) {
