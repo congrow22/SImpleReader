@@ -13,9 +13,10 @@ import * as SearchDialog from './components/SearchDialog.js';
 import * as SettingsDialog from './components/SettingsDialog.js';
 import * as FormatDialog from './components/FormatDialog.js';
 import * as GoToLineDialog from './components/GoToLineDialog.js';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { open as openDialog, ask } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 // ============================================================
 // Application State
@@ -87,9 +88,25 @@ async function initApp() {
         btnEditMode.addEventListener('click', handleToggleEditMode);
     }
 
-    // 앱 종료 시 현재 파일의 읽기 위치 저장 (fire-and-forget: 종료 블로킹 방지)
-    window.addEventListener('beforeunload', () => {
-        saveCurrentPosition().catch(() => {});
+    // 앱 종료 시 현재 위치 저장 후 닫기
+    const appWindow = getCurrentWindow();
+    appWindow.onCloseRequested(async (event) => {
+        event.preventDefault();
+        const shouldClose = await ask('현재 읽기 위치를 저장하고 종료할까요?', {
+            title: 'SimpleReader',
+            kind: 'info',
+            okLabel: '닫기',
+            cancelLabel: '취소'
+        });
+        if (shouldClose) {
+            // 저장 타임아웃 2초 (행 방지)
+            await Promise.race([
+                saveCurrentPosition(),
+                new Promise(resolve => setTimeout(resolve, 2000))
+            ]).catch(() => {});
+            // Rust 백엔드에서 직접 앱 종료 (destroy()는 권한 문제로 실패)
+            await invoke('exit_app');
+        }
     });
 
     // Load any open tabs from backend

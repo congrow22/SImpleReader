@@ -1,6 +1,7 @@
 use crate::tab_manager::{FileInfo, TabInfo, TextChunk};
 use crate::AppState;
 use tauri::command;
+use tauri::AppHandle;
 
 #[command]
 pub async fn open_file(
@@ -109,4 +110,9 @@ pub async fn get_total_lines(
     tab_manager
         .get_total_lines(&file_id)
         .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn exit_app(app: AppHandle) {
+    app.exit(0);
 }
