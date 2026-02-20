@@ -87,6 +87,11 @@ async function initApp() {
         btnEditMode.addEventListener('click', handleToggleEditMode);
     }
 
+    // 앱 종료 시 현재 파일의 읽기 위치 저장 (fire-and-forget: 종료 블로킹 방지)
+    window.addEventListener('beforeunload', () => {
+        saveCurrentPosition().catch(() => {});
+    });
+
     // Load any open tabs from backend
     try {
         const tabs = await invoke('get_open_tabs');
@@ -101,6 +106,12 @@ async function initApp() {
                 };
                 state.files.set(tab.id, fileInfo);
                 TabBar.addTab(fileInfo);
+            }
+
+            // 마지막 활성 탭 자동 복원
+            const activeTab = tabs.find(t => t.is_active);
+            if (activeTab) {
+                await openFile(activeTab.path);
             }
         }
     } catch (err) {

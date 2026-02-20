@@ -109,15 +109,18 @@ export async function loadFile(fileInfo) {
     scrollArea.classList.remove('hidden');
 
     updateScrollHeight();
+    void scrollArea.offsetHeight; // 리플로우 강제 (display:none → visible 전환 시 scrollHeight 확정)
+    await new Promise(r => requestAnimationFrame(r)); // DOM 안정화 대기
 
+    // 저장된 위치가 있으면 scrollToLine으로 정확히 이동 (책갈피 클릭과 완전히 동일)
+    // 없으면 처음부터 렌더
+    renderGeneration++;
     if (currentLine > 0) {
-        scrollArea.scrollTop = currentLine * lineHeight * getScrollRatio();
+        await scrollToLine(currentLine);
     } else {
         scrollArea.scrollTop = 0;
+        await renderVisibleLines(true);
     }
-
-    renderGeneration++;
-    await renderVisibleLines(true);
 }
 
 export function clear() {
