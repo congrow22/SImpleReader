@@ -39,6 +39,24 @@ let chapterLoadQueue = [];
 let activeChapterLoads = 0;
 const MAX_CONCURRENT_CHAPTER_LOADS = 2;
 
+// 딜레이 로딩 인디케이터 (500ms 이상 걸릴 때만 표시)
+let loadingTimer = null;
+const loadingEl = document.getElementById('epub-loading-overlay');
+
+function showLoadingDelayed(delay = 500) {
+    if (loadingTimer) clearTimeout(loadingTimer);
+    loadingTimer = setTimeout(() => {
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        loadingTimer = null;
+    }, delay);
+}
+
+function hideLoading() {
+    clearTimeout(loadingTimer);
+    loadingTimer = null;
+    if (loadingEl) loadingEl.classList.add('hidden');
+}
+
 // DOM elements
 const container = document.getElementById('epub-viewer-container');
 const chapterSelect = document.getElementById('epub-chapter-select');
@@ -170,6 +188,7 @@ function applyZoom() {
 }
 
 export async function loadFile(fileInfo) {
+    showLoadingDelayed();
     currentFileId = fileInfo.id;
     currentFilePath = fileInfo.path;
     totalChapters = fileInfo.total_chapters || 0;
@@ -218,6 +237,7 @@ export async function loadFile(fileInfo) {
 
 async function goToChapter(index) {
     if (index < 0 || index >= totalChapters || !currentFileId) return;
+    showLoadingDelayed();
 
     currentChapterIndex = index;
     chapterSelect.value = index;
@@ -345,6 +365,7 @@ async function loadAllChapters(scrollOffset) {
         continuousContainer.scrollTop = targetWrapper.offsetTop + extraOffset;
     }
     continuousContainer.style.visibility = 'visible';
+    hideLoading();
 
     // Phase 4: IntersectionObserver로 나머지 챕터 레이지 로딩
     chapterLoadQueue = [];
@@ -640,6 +661,7 @@ function renderSingleChapter(contentHtml) {
         if (iframe.contentDocument) {
             iframe.contentDocument.documentElement.scrollTop = 0;
         }
+        hideLoading();
     };
 }
 
@@ -729,6 +751,7 @@ export function navigateToChapter(index, scrollPosition) {
                         iframe.contentWindow.scrollTo(0, scrollPosition);
                     }
                     iframe.style.visibility = 'visible';
+                    hideLoading();
                 };
             }
         });
