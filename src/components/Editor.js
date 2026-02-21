@@ -414,7 +414,15 @@ async function renderVisibleLines(force = false) {
         isRendering = false;
         if (pendingRender) {
             pendingRender = false;
-            scheduleRender();
+            // scheduleRender()는 force=true → 이론적 firstVisible 사용 → word wrap 점프 유발
+            // pendingRender는 스크롤 중 동시 렌더 요청이므로 force=false로 DOM 기반 렌더
+            if (!renderSuppressed) {
+                if (scrollRAF) cancelAnimationFrame(scrollRAF);
+                scrollRAF = requestAnimationFrame(async () => {
+                    scrollRAF = null;
+                    await renderVisibleLines();
+                });
+            }
         }
     }
 }
