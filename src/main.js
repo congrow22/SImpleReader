@@ -704,11 +704,22 @@ async function saveCurrentPosition() {
 }
 
 async function openFile(path) {
+    const loadingOverlay = document.getElementById('editor-loading-overlay');
+    let loadingTimer = null;
     try {
         // 이전 파일 위치 저장
         await saveCurrentPosition();
 
+        // 500ms 이상 걸리면 로딩 스피너 표시
+        loadingTimer = setTimeout(() => {
+            loadingOverlay.classList.remove('hidden');
+            loadingTimer = null;
+        }, 500);
+
         const fileInfo = await invoke('open_file', { path: path });
+
+        clearTimeout(loadingTimer);
+        loadingOverlay.classList.add('hidden');
 
         state.files.set(fileInfo.id, fileInfo);
         state.activeFileId = fileInfo.id;
@@ -760,6 +771,8 @@ async function openFile(path) {
         updateStatusBar();
         updateViewerUI(fileInfo.file_type);
     } catch {
+        clearTimeout(loadingTimer);
+        loadingOverlay.classList.add('hidden');
         const shouldRemove = confirm('파일을 찾을 수 없습니다.\n목록에서 삭제하시겠습니까?\n\n' + path);
         if (shouldRemove) {
             try {
