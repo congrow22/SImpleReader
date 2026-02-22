@@ -286,11 +286,19 @@ async function renderVisibleLines(force = false) {
         // word wrap 시 이론적 계산(scrollTop / lineHeight)은 누적 오차로 부정확해짐
         if (!force && renderedStartLine >= 0 && linesContainer.children.length > 0) {
             const scrollRect = scrollArea.getBoundingClientRect();
-            for (let i = 0; i < linesContainer.children.length; i++) {
-                const rect = linesContainer.children[i].getBoundingClientRect();
-                if (rect.bottom > scrollRect.top) {
-                    firstVisible = renderedStartLine + i;
-                    break;
+            const firstChildRect = linesContainer.children[0].getBoundingClientRect();
+            const lastChildRect = linesContainer.children[linesContainer.children.length - 1].getBoundingClientRect();
+
+            // 렌더된 콘텐츠가 뷰포트와 실제로 겹칠 때만 DOM 기반 감지 사용
+            // 스크롤바를 빠르게 이동하면 렌더된 콘텐츠가 뷰포트 밖에 있을 수 있음
+            // 이 경우 이론적 firstVisible을 유지해야 올바른 범위가 렌더됨
+            if (firstChildRect.top < scrollRect.bottom && lastChildRect.bottom > scrollRect.top) {
+                for (let i = 0; i < linesContainer.children.length; i++) {
+                    const rect = linesContainer.children[i].getBoundingClientRect();
+                    if (rect.bottom > scrollRect.top) {
+                        firstVisible = renderedStartLine + i;
+                        break;
+                    }
                 }
             }
         }
