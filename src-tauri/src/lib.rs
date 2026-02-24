@@ -9,6 +9,7 @@ mod image_reader;
 mod search;
 mod tab_manager;
 mod text_buffer;
+mod zip_fast;
 
 use std::sync::Mutex;
 

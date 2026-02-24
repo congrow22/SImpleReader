@@ -44,6 +44,10 @@ dirs = "5"
 # 타임스탬프
 chrono = { version = "0.4", features = ["serde"] }
 
+# Memory-mapped I/O + 고속 ZIP 파서
+memmap2 = "0.9"
+flate2 = "1"
+
 # EPUB 지원
 epub = "2"
 base64 = "0.22"

@@ -1,4 +1,3 @@
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"];
@@ -140,18 +139,16 @@ pub fn scan_folder_images(file_path: &Path) -> anyhow::Result<(PathBuf, Vec<Path
 }
 
 /// List image entries in a ZIP file, sorted depth-first alphabetically.
-/// Uses only the central directory (no per-entry disk seeks).
+/// Uses custom fast parser: only reads EOCD + Central Directory (no local header validation).
 pub fn list_zip_images(zip_path: &Path) -> anyhow::Result<Vec<String>> {
-    let file = std::fs::File::open(zip_path)?;
-    let archive = zip::ZipArchive::new(file)?;
+    let index = crate::zip_fast::ZipIndex::open(zip_path)?;
 
-    let mut entries: Vec<String> = archive
-        .file_names()
+    let mut entries: Vec<String> = index
+        .entry_names()
         .filter(|name| !name.ends_with('/') && is_image_file(name))
         .map(|name| name.to_string())
         .collect();
 
-    // Sort: by directory components first (depth-first), then by filename
     entries.sort_by(|a, b| {
         let a_parts: Vec<&str> = a.split('/').collect();
         let b_parts: Vec<&str> = b.split('/').collect();
@@ -161,15 +158,8 @@ pub fn list_zip_images(zip_path: &Path) -> anyhow::Result<Vec<String>> {
     Ok(entries)
 }
 
-/// Read a single image entry from a ZIP file.
+/// Read a single image entry from a ZIP file using the fast parser.
 pub fn read_zip_image(zip_path: &Path, entry_name: &str) -> anyhow::Result<Vec<u8>> {
-    let file = std::fs::File::open(zip_path)?;
-    let mut archive = zip::ZipArchive::new(file)?;
-    let mut entry = archive
-        .by_name(entry_name)
-        .map_err(|e| anyhow::anyhow!("ZIP entry not found: {} - {}", entry_name, e))?;
-
-    let mut buf = Vec::with_capacity(entry.size() as usize);
-    entry.read_to_end(&mut buf)?;
-    Ok(buf)
+    let index = crate::zip_fast::ZipIndex::open(zip_path)?;
+    index.read_entry(entry_name)
 }

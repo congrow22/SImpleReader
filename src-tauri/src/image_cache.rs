@@ -1,7 +1,8 @@
 use std::collections::{HashMap, VecDeque};
-use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+
+use crate::zip_fast::ZipIndex;
 
 const MAX_CACHE_BYTES: usize = 100 * 1024 * 1024; // 100 MB
 const PREFETCH_AHEAD: usize = 2;
@@ -20,7 +21,7 @@ pub enum ImageSourceInfo {
 }
 
 struct ZipHandle {
-    archive: zip::ZipArchive<std::fs::File>,
+    index: ZipIndex,
 }
 
 /// LRU byte cache with a total memory budget.
@@ -224,22 +225,16 @@ impl ImageCacheManager {
                     .get(index)
                     .ok_or_else(|| anyhow::anyhow!("Image index out of range: {}", index))?;
 
-                // Lazily open and cache ZipArchive handle on first access
+                // Lazily open and cache ZipIndex handle on first access
                 if !inner.zip_handles.contains_key(file_id) {
-                    let file = std::fs::File::open(zip_path)?;
-                    let archive = zip::ZipArchive::new(file)?;
+                    let zip_index = ZipIndex::open(zip_path)?;
                     inner
                         .zip_handles
-                        .insert(file_id.to_string(), ZipHandle { archive });
+                        .insert(file_id.to_string(), ZipHandle { index: zip_index });
                 }
 
-                let handle = inner.zip_handles.get_mut(file_id).unwrap();
-                let mut entry = handle.archive.by_name(entry_name).map_err(|e| {
-                    anyhow::anyhow!("ZIP entry not found: {} - {}", entry_name, e)
-                })?;
-                let mut buf = Vec::with_capacity(entry.size() as usize);
-                entry.read_to_end(&mut buf)?;
-                Ok(buf)
+                let handle = inner.zip_handles.get(file_id).unwrap();
+                handle.index.read_entry(entry_name)
             }
         }
     }
