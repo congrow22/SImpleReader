@@ -8,6 +8,7 @@ import * as TabBar from './components/TabBar.js';
 import * as Editor from './components/Editor.js';
 import * as EpubViewer from './components/EpubViewer.js';
 import * as PdfViewer from './components/PdfViewer.js';
+import * as ImageViewer from './components/ImageViewer.js';
 import * as BookmarkPanel from './components/BookmarkPanel.js';
 import * as SearchDialog from './components/SearchDialog.js';
 import * as SettingsDialog from './components/SettingsDialog.js';
@@ -50,6 +51,7 @@ async function initApp() {
     initEditor();
     initEpubViewer();
     initPdfViewer();
+    initImageViewer();
     initBookmarkPanel();
     initSearchDialog();
     initSettingsDialog();
@@ -215,10 +217,20 @@ function initPdfViewer() {
     });
 }
 
+function initImageViewer() {
+    ImageViewer.init({
+        onImageChange: (index, totalImages) => {
+            updateImageStatusBar(index, totalImages);
+        }
+    });
+}
+
 function initBookmarkPanel() {
     BookmarkPanel.init({
         onBookmarkClick: (position, line) => {
-            if (PdfViewer.isVisible()) {
+            if (ImageViewer.isVisible()) {
+                if (line > 0) ImageViewer.navigateToImage(line - 1);
+            } else if (PdfViewer.isVisible()) {
                 if (line > 0) PdfViewer.navigateToPage(line);
             } else if (EpubViewer.isVisible()) {
                 EpubViewer.navigateToChapter(line, position);
@@ -452,7 +464,7 @@ function initKeyboardShortcuts() {
         // Ctrl+Shift+F: Text formatting
         if (ctrl && shift && e.key === 'F') {
             e.preventDefault();
-            if (EpubViewer.isVisible() || PdfViewer.isVisible()) {
+            if (EpubViewer.isVisible() || PdfViewer.isVisible() || ImageViewer.isVisible()) {
                 alert('텍스트 정리는 텍스트 파일에서만 사용할 수 있습니다.');
                 return;
             }
@@ -611,7 +623,7 @@ function handleMenuAction(action) {
             SearchDialog.setFileId(Editor.getCurrentFileId());
             break;
         case 'format': {
-            if (EpubViewer.isVisible() || PdfViewer.isVisible()) {
+            if (EpubViewer.isVisible() || PdfViewer.isVisible() || ImageViewer.isVisible()) {
                 alert('텍스트 정리는 텍스트 파일에서만 사용할 수 있습니다.');
                 break;
             }
@@ -652,10 +664,12 @@ async function handleOpenFile() {
         const filePath = await openDialog({
             multiple: false,
             filters: [
-                { name: 'Supported Files', extensions: ['txt', 'md', 'log', 'csv', 'json', 'epub', 'pdf'] },
+                { name: 'Supported Files', extensions: ['txt', 'md', 'log', 'csv', 'json', 'epub', 'pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'zip'] },
                 { name: 'Text Files', extensions: ['txt', 'md', 'log', 'csv', 'json'] },
                 { name: 'EPUB Files', extensions: ['epub'] },
-                { name: 'PDF Files', extensions: ['pdf'] }
+                { name: 'PDF Files', extensions: ['pdf'] },
+                { name: 'Image Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'] },
+                { name: 'ZIP Archives', extensions: ['zip'] }
             ]
         });
 
@@ -675,6 +689,16 @@ async function saveCurrentPosition() {
                 await invoke('save_last_position', {
                     filePath: filePath,
                     position: PdfViewer.getCurrentPage()
+                });
+            } catch { /* non-critical */ }
+        }
+    } else if (ImageViewer.isVisible()) {
+        const filePath = ImageViewer.getCurrentFilePath();
+        if (filePath) {
+            try {
+                await invoke('save_last_position', {
+                    filePath: filePath,
+                    position: ImageViewer.getCurrentIndex()
                 });
             } catch { /* non-critical */ }
         }
@@ -729,18 +753,28 @@ async function openFile(path) {
         if (fileInfo.file_type === 'epub') {
             Editor.clear();
             PdfViewer.hide();
+            ImageViewer.hide();
             document.getElementById('editor-container').classList.add('hidden');
             await EpubViewer.loadFile(fileInfo);
             updateEpubStatusBar(fileInfo.last_position || 0, fileInfo.total_chapters);
         } else if (fileInfo.file_type === 'pdf') {
             Editor.clear();
             EpubViewer.hide();
+            ImageViewer.hide();
             document.getElementById('editor-container').classList.add('hidden');
             await PdfViewer.loadFile(fileInfo);
             updatePdfStatusBar(fileInfo.last_position || 1, 0);
+        } else if (fileInfo.file_type === 'image') {
+            Editor.clear();
+            EpubViewer.hide();
+            PdfViewer.hide();
+            document.getElementById('editor-container').classList.add('hidden');
+            await ImageViewer.loadFile(fileInfo);
+            updateImageStatusBar(fileInfo.last_position || 0, fileInfo.total_images || 0);
         } else {
             EpubViewer.hide();
             PdfViewer.hide();
+            ImageViewer.hide();
             document.getElementById('editor-container').classList.remove('hidden');
             await Editor.loadFile(fileInfo);
             SearchDialog.setFileId(fileInfo.id);
@@ -787,7 +821,7 @@ async function openFile(path) {
 
 async function handleSave() {
     // EPUB/PDF files are read-only
-    if (EpubViewer.isVisible() || PdfViewer.isVisible()) return;
+    if (EpubViewer.isVisible() || PdfViewer.isVisible() || ImageViewer.isVisible()) return;
 
     const fileId = Editor.getCurrentFileId();
     if (!fileId) return;
@@ -826,6 +860,7 @@ async function handleTabClose(fileId) {
         Editor.clear();
         EpubViewer.clear();
         PdfViewer.clear();
+        ImageViewer.clear();
         document.getElementById('editor-container').classList.remove('hidden');
         SearchDialog.setFileId(null);
         updateStatusBar();
@@ -839,6 +874,7 @@ async function handleTabSwitch(fileId) {
         Editor.clear();
         EpubViewer.clear();
         PdfViewer.clear();
+        ImageViewer.clear();
         document.getElementById('editor-container').classList.remove('hidden');
         updateStatusBar();
         updateViewerUI('text');
@@ -877,17 +913,27 @@ async function showFileByType(fileInfo, fileId) {
     if (fileInfo.file_type === 'epub') {
         Editor.clear();
         PdfViewer.hide();
+        ImageViewer.hide();
         document.getElementById('editor-container').classList.add('hidden');
         await EpubViewer.loadFile(fileInfo);
         updateEpubStatusBar(fileInfo.last_position || 0, fileInfo.total_chapters);
     } else if (fileInfo.file_type === 'pdf') {
         Editor.clear();
         EpubViewer.hide();
+        ImageViewer.hide();
         document.getElementById('editor-container').classList.add('hidden');
         await PdfViewer.loadFile(fileInfo);
+    } else if (fileInfo.file_type === 'image') {
+        Editor.clear();
+        EpubViewer.hide();
+        PdfViewer.hide();
+        document.getElementById('editor-container').classList.add('hidden');
+        await ImageViewer.loadFile(fileInfo);
+        updateImageStatusBar(fileInfo.last_position || 0, fileInfo.total_images || 0);
     } else {
         EpubViewer.hide();
         PdfViewer.hide();
+        ImageViewer.hide();
         document.getElementById('editor-container').classList.remove('hidden');
         await Editor.loadFile(fileInfo);
         SearchDialog.setFileId(fileId);
@@ -914,12 +960,15 @@ async function showFileByType(fileInfo, fileId) {
 // ============================================================
 
 function handleAddBookmark() {
+    const isImage = ImageViewer.isVisible();
     const isEpub = EpubViewer.isVisible();
     const isPdf = PdfViewer.isVisible();
-    const fileId = isEpub ? EpubViewer.getCurrentFileId()
+    const fileId = isImage ? ImageViewer.getCurrentFileId()
+        : isEpub ? EpubViewer.getCurrentFileId()
         : isPdf ? PdfViewer.getCurrentFileId()
         : Editor.getCurrentFileId();
-    const filePath = isEpub ? EpubViewer.getCurrentFilePath()
+    const filePath = isImage ? ImageViewer.getCurrentFilePath()
+        : isEpub ? EpubViewer.getCurrentFilePath()
         : isPdf ? PdfViewer.getCurrentFilePath()
         : Editor.getCurrentFilePath();
     if (!fileId || !filePath) {
@@ -927,7 +976,8 @@ function handleAddBookmark() {
         return;
     }
 
-    const currentLine = isEpub ? EpubViewer.getCurrentChapter()
+    const currentLine = isImage ? (ImageViewer.getCurrentIndex() + 1)
+        : isEpub ? EpubViewer.getCurrentChapter()
         : isPdf ? PdfViewer.getCurrentPage()
         : Editor.getCurrentLine();
     // EPUB: position = 스크롤 위치, line = 챕터 인덱스 / 나머지: position = line
@@ -939,7 +989,9 @@ function handleAddBookmark() {
     const btnCancel = document.getElementById('btn-bookmark-add-cancel');
     const btnClose = document.getElementById('btn-bookmark-add-close');
 
-    if (isEpub) {
+    if (isImage) {
+        infoEl.textContent = '이미지 ' + currentLine + ' / ' + ImageViewer.getTotalImages();
+    } else if (isEpub) {
         infoEl.textContent = '챕터 ' + (currentLine + 1) + ' / ' + EpubViewer.getTotalChapters();
     } else if (isPdf) {
         infoEl.textContent = '페이지 ' + currentLine + ' / ' + PdfViewer.getTotalPages();
@@ -996,7 +1048,7 @@ function handleAddBookmark() {
 
 function handleToggleEditMode() {
     // Disable edit mode for EPUB/PDF files
-    if (EpubViewer.isVisible() || PdfViewer.isVisible()) return;
+    if (EpubViewer.isVisible() || PdfViewer.isVisible() || ImageViewer.isVisible()) return;
     const editMode = Editor.toggleEditMode();
     updateEditModeUI(editMode);
 }
@@ -1094,7 +1146,7 @@ async function handleToggleLineNumbers() {
  * Disables edit/save buttons for EPUB/PDF files.
  */
 function updateViewerUI(fileType) {
-    const isReadOnly = fileType === 'epub' || fileType === 'pdf';
+    const isReadOnly = fileType === 'epub' || fileType === 'pdf' || fileType === 'image';
     const btnSave = document.getElementById('btn-save');
     const btnEditMode = document.getElementById('btn-edit-mode');
     if (btnSave) {
@@ -1115,6 +1167,8 @@ function updateViewerUI(fileType) {
             statusMode.textContent = 'EPUB';
         } else if (fileType === 'pdf') {
             statusMode.textContent = 'PDF';
+        } else if (fileType === 'image') {
+            statusMode.textContent = '이미지';
         } else {
             statusMode.textContent = Editor.isEditMode() ? '편집' : '뷰어';
         }
@@ -1143,6 +1197,17 @@ function updatePdfStatusBar(page, totalPages) {
     document.getElementById('status-modified').textContent = '';
 }
 
+function updateImageStatusBar(index, totalImages) {
+    const percent = totalImages > 0
+        ? ((index + 1) / totalImages * 100).toFixed(1)
+        : '0.0';
+    document.getElementById('status-line').textContent =
+        '이미지: ' + (index + 1) + ' / ' + totalImages + ' (' + percent + ' %)';
+    document.getElementById('status-chars').textContent = '';
+    document.getElementById('status-encoding').textContent = '이미지';
+    document.getElementById('status-modified').textContent = '';
+}
+
 function updateStatusBar() {
     if (EpubViewer.isVisible()) {
         updateEpubStatusBar(EpubViewer.getCurrentChapter(), EpubViewer.getTotalChapters());
@@ -1150,6 +1215,10 @@ function updateStatusBar() {
     }
     if (PdfViewer.isVisible()) {
         updatePdfStatusBar(PdfViewer.getCurrentPage(), PdfViewer.getTotalPages());
+        return;
+    }
+    if (ImageViewer.isVisible()) {
+        updateImageStatusBar(ImageViewer.getCurrentIndex(), ImageViewer.getTotalImages());
         return;
     }
 

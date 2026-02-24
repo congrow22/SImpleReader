@@ -4,6 +4,7 @@ mod config;
 mod epub_reader;
 mod error;
 mod formatter;
+mod image_reader;
 mod search;
 mod tab_manager;
 mod text_buffer;
@@ -144,6 +145,9 @@ pub fn run() {
             commands::get_epub_font_styles,
             // PDF commands
             commands::read_pdf_bytes,
+            // Image commands
+            commands::get_image_list,
+            commands::get_image_bytes,
             // App lifecycle
             commands::exit_app,
         ])

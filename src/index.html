@@ -283,6 +283,42 @@
                         <div class="pdf-loading-spinner"></div>
                     </div>
                 </div>
+
+                <!-- Image Viewer Container -->
+                <div id="image-viewer-container" class="image-viewer-container hidden">
+                    <div class="image-nav-bar" id="image-nav-bar">
+                        <button class="epub-nav-btn" id="image-btn-prev" title="이전 이미지" disabled>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                            </svg>
+                        </button>
+                        <input type="number" class="pdf-page-input" id="image-page-input" value="1" min="1" title="이미지 번호" />
+                        <span class="pdf-page-label" id="image-page-label">/ 0</span>
+                        <button class="epub-nav-btn" id="image-btn-next" title="다음 이미지" disabled>
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                            </svg>
+                        </button>
+                        <span class="epub-nav-separator"></span>
+                        <span class="image-name-label" id="image-name-label"></span>
+                        <span class="epub-nav-separator"></span>
+                        <button class="epub-nav-btn" id="image-btn-zoom-out" title="축소 (Ctrl+-)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M4 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 4 8z"/>
+                            </svg>
+                        </button>
+                        <span class="epub-zoom-label" id="image-zoom-label" title="더블클릭으로 초기화">100%</span>
+                        <button class="epub-nav-btn" id="image-btn-zoom-in" title="확대 (Ctrl++)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="image-content" id="image-content" tabindex="0"></div>
+                    <div id="image-loading-overlay" class="image-loading-overlay hidden">
+                        <div class="image-loading-spinner"></div>
+                    </div>
+                </div>
             </div>
         </div>
 

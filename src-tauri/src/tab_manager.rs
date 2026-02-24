@@ -1,4 +1,5 @@
 use crate::epub_reader::EpubBook;
+use crate::image_reader::ImageSource;
 use crate::text_buffer::TextBuffer;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -8,12 +9,14 @@ pub enum FileType {
     Text,
     Epub,
     Pdf,
+    Image,
 }
 
 pub struct Tab {
     pub path: PathBuf,
     pub buffer: Option<TextBuffer>,
     pub epub_book: Option<EpubBook>,
+    pub image_source: Option<ImageSource>,
     pub last_position: usize,
     pub last_scroll_offset: usize,
     pub is_modified: bool,
@@ -32,6 +35,7 @@ pub struct FileInfo {
     pub is_modified: bool,
     pub file_type: String,
     pub total_chapters: usize,
+    pub total_images: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -88,6 +92,8 @@ impl TabManager {
             self.open_epub(path, &file_path, last_position, last_scroll_offset)
         } else if ext == "pdf" {
             self.open_pdf(path, &file_path, last_position, last_scroll_offset)
+        } else if crate::image_reader::is_image_extension(&ext) || ext == "zip" {
+            self.open_image(path, &file_path, last_position, last_scroll_offset)
         } else {
             self.open_text(path, &file_path, last_position, last_scroll_offset)
         }
@@ -108,6 +114,7 @@ impl TabManager {
             path: file_path.clone(),
             buffer: Some(buffer),
             epub_book: None,
+            image_source: None,
             last_position,
             last_scroll_offset,
             is_modified: false,
@@ -133,6 +140,7 @@ impl TabManager {
             is_modified: false,
             file_type: "text".to_string(),
             total_chapters: 0,
+            total_images: 0,
         })
     }
 
@@ -155,6 +163,7 @@ impl TabManager {
             path: file_path.clone(),
             buffer: None,
             epub_book: Some(epub_book),
+            image_source: None,
             last_position,
             last_scroll_offset,
             is_modified: false,
@@ -175,6 +184,7 @@ impl TabManager {
             is_modified: false,
             file_type: "epub".to_string(),
             total_chapters,
+            total_images: 0,
         })
     }
 
@@ -194,6 +204,7 @@ impl TabManager {
             path: file_path.clone(),
             buffer: None,
             epub_book: None,
+            image_source: None,
             last_position,
             last_scroll_offset,
             is_modified: false,
@@ -214,6 +225,7 @@ impl TabManager {
             is_modified: false,
             file_type: "pdf".to_string(),
             total_chapters: 0,
+            total_images: 0,
         })
     }
 
@@ -259,12 +271,13 @@ impl TabManager {
             tab.buffer = Some(TextBuffer::from_file(&tab.path)?);
         }
 
-        let (total_lines, total_chars, total_chapters, file_type_str) = match tab.file_type {
+        let (total_lines, total_chars, total_chapters, total_images, file_type_str) = match tab.file_type {
             FileType::Text => {
                 let buffer = tab.buffer.as_ref().unwrap();
                 (
                     buffer.get_total_lines(),
                     buffer.get_total_chars(),
+                    0,
                     0,
                     "text".to_string(),
                 )
@@ -275,9 +288,17 @@ impl TabManager {
                     .as_ref()
                     .map(|b| b.total_chapters())
                     .unwrap_or(0);
-                (0, 0, chapters, "epub".to_string())
+                (0, 0, chapters, 0, "epub".to_string())
             }
-            FileType::Pdf => (0, 0, 0, "pdf".to_string()),
+            FileType::Pdf => (0, 0, 0, 0, "pdf".to_string()),
+            FileType::Image => {
+                let count = tab
+                    .image_source
+                    .as_ref()
+                    .map(|s| s.len())
+                    .unwrap_or(0);
+                (0, 0, 0, count, "image".to_string())
+            }
         };
 
         let last_position = tab.last_position;
@@ -303,6 +324,7 @@ impl TabManager {
             is_modified,
             file_type: file_type_str,
             total_chapters,
+            total_images,
         })
     }
 
@@ -320,6 +342,7 @@ impl TabManager {
                     FileType::Text => "text",
                     FileType::Epub => "epub",
                     FileType::Pdf => "pdf",
+                    FileType::Image => "image",
                 };
                 TabInfo {
                     id: id.clone(),
@@ -482,5 +505,104 @@ impl TabManager {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Not an EPUB file: {}", file_id))?;
         Ok(epub_book.get_chapter_infos())
+    }
+
+    fn open_image(
+        &mut self,
+        path: &str,
+        file_path: &PathBuf,
+        last_position: usize,
+        last_scroll_offset: usize,
+    ) -> anyhow::Result<FileInfo> {
+        let ext = file_path
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        let (image_source, initial_position) = if ext == "zip" {
+            let entries = crate::image_reader::list_zip_images(file_path)?;
+            (
+                ImageSource::Zip {
+                    zip_path: file_path.clone(),
+                    entry_names: entries,
+                },
+                last_position,
+            )
+        } else {
+            let (dir_path, image_paths, current_index) =
+                crate::image_reader::scan_folder_images(file_path)?;
+            let position = if last_position == 0 {
+                current_index
+            } else {
+                last_position
+            };
+            (
+                ImageSource::Folder {
+                    dir_path,
+                    image_paths,
+                },
+                position,
+            )
+        };
+
+        let total_images = image_source.len();
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.to_string());
+
+        let tab = Tab {
+            path: file_path.clone(),
+            buffer: None,
+            epub_book: None,
+            image_source: Some(image_source),
+            last_position: initial_position,
+            last_scroll_offset,
+            is_modified: false,
+            file_type: FileType::Image,
+        };
+
+        self.tabs.insert(path.to_string(), tab);
+        self.active_tab = Some(path.to_string());
+
+        Ok(FileInfo {
+            id: path.to_string(),
+            name: file_name,
+            path: path.to_string(),
+            total_lines: 0,
+            total_chars: 0,
+            last_position: initial_position,
+            last_scroll_offset,
+            is_modified: false,
+            file_type: "image".to_string(),
+            total_chapters: 0,
+            total_images,
+        })
+    }
+
+    /// Get image filename list for the image viewer.
+    pub fn get_image_list(&self, file_id: &str) -> anyhow::Result<Vec<String>> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let source = tab
+            .image_source
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not an image file: {}", file_id))?;
+        Ok(source.names())
+    }
+
+    /// Read image bytes at a given index.
+    pub fn get_image_bytes(&self, file_id: &str, index: usize) -> anyhow::Result<Vec<u8>> {
+        let tab = self
+            .tabs
+            .get(file_id)
+            .ok_or_else(|| anyhow::anyhow!("Tab not found: {}", file_id))?;
+        let source = tab
+            .image_source
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not an image file: {}", file_id))?;
+        source.read_bytes(index)
     }
 }
