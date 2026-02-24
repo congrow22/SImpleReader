@@ -20,20 +20,20 @@ export function init({ onSwitch, onClose, onNew }) {
 export function addTab(fileInfo) {
     // Check if tab already exists
     const existing = tabs.find(t => t.id === fileInfo.id);
-    if (existing) {
-        switchTab(fileInfo.id);
-        return;
+    if (!existing) {
+        const tab = {
+            id: fileInfo.id,
+            name: fileInfo.name,
+            path: fileInfo.path,
+            isModified: fileInfo.is_modified || false
+        };
+        tabs.push(tab);
     }
 
-    const tab = {
-        id: fileInfo.id,
-        name: fileInfo.name,
-        path: fileInfo.path,
-        isModified: fileInfo.is_modified || false
-    };
-    tabs.push(tab);
+    // Only update visual state — openFile already handles file loading,
+    // so we must NOT trigger onTabSwitch here to avoid a race condition.
+    activeTabId = fileInfo.id;
     renderTabs();
-    switchTab(tab.id);
 }
 
 export function removeTab(id) {

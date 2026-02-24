@@ -164,6 +164,19 @@ export async function loadFile(fileInfo) {
         totalImages = 0;
     }
 
+    // If an initial image name is provided, find its index in the list
+    let nameIdx = -1;
+    if (fileInfo.initial_image_name && imageNames.length > 0) {
+        const targetName = fileInfo.initial_image_name.toLowerCase();
+        nameIdx = imageNames.findIndex(n => {
+            const shortName = (n.split('/').pop() || n).toLowerCase();
+            return shortName === targetName;
+        });
+        if (nameIdx >= 0) {
+            currentIndex = nameIdx;
+        }
+    }
+
     if (currentIndex >= totalImages) currentIndex = 0;
 
     show();

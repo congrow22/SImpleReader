@@ -124,7 +124,17 @@ pub fn scan_folder_images(file_path: &Path) -> anyhow::Result<(PathBuf, Vec<Path
         a_name.cmp(&b_name)
     });
 
-    let current_index = images.iter().position(|p| p == file_path).unwrap_or(0);
+    let target_name = file_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_lowercase());
+    let current_index = images
+        .iter()
+        .position(|p| {
+            p.file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                == target_name
+        })
+        .unwrap_or(0);
 
     Ok((dir.to_path_buf(), images, current_index))
 }

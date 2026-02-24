@@ -36,6 +36,7 @@ pub struct FileInfo {
     pub file_type: String,
     pub total_chapters: usize,
     pub total_images: usize,
+    pub initial_image_name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -146,6 +147,7 @@ impl TabManager {
             file_type: "text".to_string(),
             total_chapters: 0,
             total_images: 0,
+            initial_image_name: String::new(),
         })
     }
 
@@ -190,6 +192,7 @@ impl TabManager {
             file_type: "epub".to_string(),
             total_chapters,
             total_images: 0,
+            initial_image_name: String::new(),
         })
     }
 
@@ -231,6 +234,7 @@ impl TabManager {
             file_type: "pdf".to_string(),
             total_chapters: 0,
             total_images: 0,
+            initial_image_name: String::new(),
         })
     }
 
@@ -330,6 +334,7 @@ impl TabManager {
             file_type: file_type_str,
             total_chapters,
             total_images,
+            initial_image_name: String::new(),
         })
     }
 
@@ -561,6 +566,7 @@ impl TabManager {
             file_type: "image".to_string(),
             total_chapters: 0,
             total_images,
+            initial_image_name: String::new(),
         })
     }
 
@@ -588,17 +594,12 @@ impl TabManager {
         } else {
             let (dir_path, image_paths, current_index) =
                 crate::image_reader::scan_folder_images(file_path)?;
-            let position = if last_position == 0 {
-                current_index
-            } else {
-                last_position
-            };
             (
                 ImageSource::Folder {
                     dir_path,
                     image_paths,
                 },
-                position,
+                current_index,
             )
         };
 
@@ -624,7 +625,7 @@ impl TabManager {
 
         Ok(FileInfo {
             id: path.to_string(),
-            name: file_name,
+            name: file_name.clone(),
             path: path.to_string(),
             total_lines: 0,
             total_chars: 0,
@@ -634,6 +635,7 @@ impl TabManager {
             file_type: "image".to_string(),
             total_chapters: 0,
             total_images,
+            initial_image_name: file_name,
         })
     }
 
