@@ -4,6 +4,7 @@ mod config;
 mod epub_reader;
 mod error;
 mod formatter;
+mod image_cache;
 mod image_reader;
 mod search;
 mod tab_manager;
@@ -14,6 +15,7 @@ use std::sync::Mutex;
 pub struct AppState {
     pub tab_manager: Mutex<tab_manager::TabManager>,
     pub bookmark_store: Mutex<bookmark::BookmarkStore>,
+    pub image_cache: image_cache::ImageCacheManager,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -28,6 +30,7 @@ pub fn run() {
     let app_state = AppState {
         tab_manager: Mutex::new(tab_manager::TabManager::new()),
         bookmark_store: Mutex::new(bookmark_store),
+        image_cache: image_cache::ImageCacheManager::new(),
     };
 
     tauri::Builder::default()

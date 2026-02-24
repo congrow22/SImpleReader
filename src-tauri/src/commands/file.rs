@@ -14,10 +14,23 @@ pub async fn open_file(
         store.get_last_position(&path).unwrap_or((0, 0))
     };
 
-    let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
-    tab_manager
-        .open_file(&path, last_position, last_scroll_offset)
-        .map_err(|e| e.to_string())
+    let file_info = {
+        let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
+        let info = tab_manager
+            .open_file(&path, last_position, last_scroll_offset)
+            .map_err(|e| e.to_string())?;
+
+        // Register image source in cache for fast access
+        if info.file_type == "image" {
+            if let Some(source_info) = tab_manager.get_image_source_info(&info.id) {
+                state.image_cache.register(&info.id, source_info);
+            }
+        }
+
+        info
+    };
+
+    Ok(file_info)
 }
 
 #[command]
@@ -29,6 +42,9 @@ pub async fn close_file(
         let mut tab_manager = state.tab_manager.lock().map_err(|e| e.to_string())?;
         tab_manager.close_tab(&file_id).map_err(|e| e.to_string())?
     };
+
+    // Clean up image cache
+    state.image_cache.unregister(&file_id);
 
     // Save last position to bookmark store
     let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;

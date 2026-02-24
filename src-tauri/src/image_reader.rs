@@ -140,20 +140,15 @@ pub fn scan_folder_images(file_path: &Path) -> anyhow::Result<(PathBuf, Vec<Path
 }
 
 /// List image entries in a ZIP file, sorted depth-first alphabetically.
+/// Uses only the central directory (no per-entry disk seeks).
 pub fn list_zip_images(zip_path: &Path) -> anyhow::Result<Vec<String>> {
     let file = std::fs::File::open(zip_path)?;
-    let mut archive = zip::ZipArchive::new(file)?;
+    let archive = zip::ZipArchive::new(file)?;
 
-    let mut entries: Vec<String> = (0..archive.len())
-        .filter_map(|i| {
-            let entry = archive.by_index(i).ok()?;
-            let name = entry.name().to_string();
-            if !entry.is_dir() && is_image_file(&name) {
-                Some(name)
-            } else {
-                None
-            }
-        })
+    let mut entries: Vec<String> = archive
+        .file_names()
+        .filter(|name| !name.ends_with('/') && is_image_file(name))
+        .map(|name| name.to_string())
         .collect();
 
     // Sort: by directory components first (depth-first), then by filename

@@ -664,4 +664,36 @@ impl TabManager {
             .ok_or_else(|| anyhow::anyhow!("Not an image file: {}", file_id))?;
         source.read_bytes(index)
     }
+
+    /// Get image source info for cache registration.
+    pub fn get_image_source_info(
+        &self,
+        file_id: &str,
+    ) -> Option<crate::image_cache::ImageSourceInfo> {
+        let tab = self.tabs.get(file_id)?;
+        let source = tab.image_source.as_ref()?;
+        Some(match source {
+            ImageSource::Folder { image_paths, .. } => {
+                crate::image_cache::ImageSourceInfo::Folder {
+                    image_paths: image_paths.clone(),
+                }
+            }
+            ImageSource::Zip {
+                zip_path,
+                entry_names,
+            } => crate::image_cache::ImageSourceInfo::Zip {
+                zip_path: zip_path.clone(),
+                entry_names: entry_names.clone(),
+            },
+        })
+    }
+
+    /// Get total image count for a tab.
+    pub fn get_image_count(&self, file_id: &str) -> usize {
+        self.tabs
+            .get(file_id)
+            .and_then(|t| t.image_source.as_ref())
+            .map(|s| s.len())
+            .unwrap_or(0)
+    }
 }
