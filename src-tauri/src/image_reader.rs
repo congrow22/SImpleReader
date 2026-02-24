@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"];
 
+#[allow(dead_code)]
 pub enum ImageSource {
     Folder {
         dir_path: PathBuf,
@@ -67,6 +68,34 @@ fn is_image_file(name: &str) -> bool {
     IMAGE_EXTENSIONS
         .iter()
         .any(|ext| lower.ends_with(&format!(".{}", ext)))
+}
+
+/// Scan a directory itself for image files.
+/// Returns (directory path, sorted image paths).
+pub fn scan_directory_images(dir_path: &Path) -> anyhow::Result<(PathBuf, Vec<PathBuf>)> {
+    if !dir_path.is_dir() {
+        anyhow::bail!("Not a directory: {}", dir_path.display());
+    }
+
+    let mut images: Vec<PathBuf> = std::fs::read_dir(dir_path)?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|p| p.is_file() && is_image_file(&p.to_string_lossy()))
+        .collect();
+
+    images.sort_by(|a, b| {
+        let a_name = a
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let b_name = b
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        a_name.cmp(&b_name)
+    });
+
+    Ok((dir_path.to_path_buf(), images))
 }
 
 /// Scan the parent directory of `file_path` for image files.

@@ -83,6 +83,11 @@ impl TabManager {
             anyhow::bail!("File not found: {}", path);
         }
 
+        // Directory → open as image folder
+        if file_path.is_dir() {
+            return self.open_image_directory(path, &file_path, last_position, last_scroll_offset);
+        }
+
         let ext = file_path
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
@@ -505,6 +510,58 @@ impl TabManager {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Not an EPUB file: {}", file_id))?;
         Ok(epub_book.get_chapter_infos())
+    }
+
+    fn open_image_directory(
+        &mut self,
+        path: &str,
+        dir_path: &PathBuf,
+        last_position: usize,
+        last_scroll_offset: usize,
+    ) -> anyhow::Result<FileInfo> {
+        let (dir, image_paths) = crate::image_reader::scan_directory_images(dir_path)?;
+        if image_paths.is_empty() {
+            anyhow::bail!("No image files found in directory: {}", dir_path.display());
+        }
+
+        let image_source = ImageSource::Folder {
+            dir_path: dir,
+            image_paths,
+        };
+        let total_images = image_source.len();
+
+        let dir_name = dir_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.to_string());
+
+        let tab = Tab {
+            path: dir_path.clone(),
+            buffer: None,
+            epub_book: None,
+            image_source: Some(image_source),
+            last_position,
+            last_scroll_offset,
+            is_modified: false,
+            file_type: FileType::Image,
+        };
+
+        self.tabs.insert(path.to_string(), tab);
+        self.active_tab = Some(path.to_string());
+
+        Ok(FileInfo {
+            id: path.to_string(),
+            name: dir_name,
+            path: path.to_string(),
+            total_lines: 0,
+            total_chars: 0,
+            last_position,
+            last_scroll_offset,
+            is_modified: false,
+            file_type: "image".to_string(),
+            total_chapters: 0,
+            total_images,
+        })
     }
 
     fn open_image(

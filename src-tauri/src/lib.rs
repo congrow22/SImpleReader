@@ -58,7 +58,7 @@ pub fn run() {
             if args.len() > 1 {
                 let file_path = args[1].clone();
                 let path = std::path::Path::new(&file_path);
-                if path.exists() && path.is_file() {
+                if path.exists() {
                     use tauri::Emitter;
                     let _ = app.emit("open-file-from-args", file_path);
                 }
@@ -78,7 +78,7 @@ pub fn run() {
             if args.len() > 1 {
                 let file_path = args[1].clone();
                 let path = std::path::Path::new(&file_path);
-                if path.exists() && path.is_file() {
+                if path.exists() {
                     use tauri::Emitter;
                     let handle = app.handle().clone();
                     // Emit after a short delay to ensure frontend is ready

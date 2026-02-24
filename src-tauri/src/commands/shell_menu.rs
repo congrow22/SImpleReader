@@ -40,6 +40,28 @@ pub fn register_context_menu() -> Result<bool, String> {
             .set_value("", &cmd_value)
             .map_err(|e| format!("Failed to set command: {}", e))?;
 
+        // Also register for directories (folders)
+        let dir_shell_key = hkcu
+            .create_subkey(r"Software\Classes\Directory\shell\SimpleReader")
+            .map_err(|e| format!("Failed to create directory registry key: {}", e))?
+            .0;
+
+        dir_shell_key
+            .set_value("", &"Open with SimpleReader")
+            .map_err(|e| format!("Failed to set value: {}", e))?;
+        dir_shell_key
+            .set_value("Icon", &exe_str)
+            .map_err(|e| format!("Failed to set icon: {}", e))?;
+
+        let dir_cmd_key = hkcu
+            .create_subkey(r"Software\Classes\Directory\shell\SimpleReader\command")
+            .map_err(|e| format!("Failed to create directory command key: {}", e))?
+            .0;
+
+        dir_cmd_key
+            .set_value("", &cmd_value)
+            .map_err(|e| format!("Failed to set command: {}", e))?;
+
         Ok(true)
     }
 
@@ -56,9 +78,13 @@ pub fn unregister_context_menu() -> Result<bool, String> {
     {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-        // Delete command subkey first, then shell key
+        // Delete command subkey first, then shell key (files)
         let _ = hkcu.delete_subkey(r"Software\Classes\*\shell\SimpleReader\command");
         let _ = hkcu.delete_subkey(r"Software\Classes\*\shell\SimpleReader");
+
+        // Delete directory context menu keys
+        let _ = hkcu.delete_subkey(r"Software\Classes\Directory\shell\SimpleReader\command");
+        let _ = hkcu.delete_subkey(r"Software\Classes\Directory\shell\SimpleReader");
 
         Ok(true)
     }
