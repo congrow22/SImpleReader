@@ -46,7 +46,20 @@ export function init(options = {}) {
     imgElement.draggable = false;
     contentArea.appendChild(imgElement);
 
-    // Navigation
+    // Side navigation arrows
+    const arrowPrev = document.createElement('button');
+    arrowPrev.className = 'image-side-arrow image-side-arrow-left';
+    arrowPrev.innerHTML = '<svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>';
+    arrowPrev.addEventListener('click', () => goToImage(currentIndex - 1));
+    contentArea.appendChild(arrowPrev);
+
+    const arrowNext = document.createElement('button');
+    arrowNext.className = 'image-side-arrow image-side-arrow-right';
+    arrowNext.innerHTML = '<svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>';
+    arrowNext.addEventListener('click', () => goToImage(currentIndex + 1));
+    contentArea.appendChild(arrowNext);
+
+    // Navigation (top bar buttons)
     btnPrev.addEventListener('click', () => goToImage(currentIndex - 1));
     btnNext.addEventListener('click', () => goToImage(currentIndex + 1));
 
