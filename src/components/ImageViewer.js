@@ -15,6 +15,7 @@ let onImageChange = null;
 
 // Zoom state
 let zoomLevel = 100;
+let fitToPage = true;
 const ZOOM_MIN = 10;
 const ZOOM_MAX = 500;
 const ZOOM_STEP = 10;
@@ -32,6 +33,7 @@ const contentArea = document.getElementById('image-content');
 const btnZoomIn = document.getElementById('image-btn-zoom-in');
 const btnZoomOut = document.getElementById('image-btn-zoom-out');
 const zoomLabel = document.getElementById('image-zoom-label');
+const btnFitToPage = document.getElementById('image-btn-fit');
 const loadingOverlay = document.getElementById('image-loading-overlay');
 const imageNameLabel = document.getElementById('image-name-label');
 
@@ -79,7 +81,8 @@ export function init(options = {}) {
     // Zoom controls
     btnZoomIn.addEventListener('click', () => setZoom(zoomLevel + ZOOM_STEP));
     btnZoomOut.addEventListener('click', () => setZoom(zoomLevel - ZOOM_STEP));
-    zoomLabel.addEventListener('dblclick', () => setZoom(100));
+    zoomLabel.addEventListener('dblclick', () => toggleFitToPage());
+    btnFitToPage.addEventListener('click', () => toggleFitToPage());
 
     // Keyboard navigation
     contentArea.addEventListener('keydown', handleKeydown);
@@ -99,7 +102,7 @@ function handleKeydown(e) {
         }
         if (e.key === '0') {
             e.preventDefault();
-            setZoom(100);
+            toggleFitToPage();
             return;
         }
     }
@@ -126,24 +129,48 @@ function handleKeydown(e) {
 }
 
 function setZoom(level) {
+    fitToPage = false;
+    btnFitToPage.classList.remove('active');
     zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, level));
     zoomLabel.textContent = zoomLevel + '%';
     applyZoom();
 }
 
+function toggleFitToPage() {
+    fitToPage = !fitToPage;
+    btnFitToPage.classList.toggle('active', fitToPage);
+    if (fitToPage) {
+        zoomLevel = 100;
+        zoomLabel.textContent = '맞춤';
+    } else {
+        zoomLabel.textContent = zoomLevel + '%';
+    }
+    applyZoom();
+}
+
 function applyZoom() {
     if (!imgElement) return;
-    if (zoomLevel === 100) {
+    if (fitToPage) {
+        // 페이지 맞춤: 작은 이미지도 컨테이너에 맞게 확대
+        imgElement.style.maxWidth = '100%';
+        imgElement.style.maxHeight = '100%';
+        imgElement.style.width = '100%';
+        imgElement.style.height = '100%';
+        imgElement.style.objectFit = 'contain';
+    } else if (zoomLevel === 100) {
+        // 원본 크기
         imgElement.style.maxWidth = '100%';
         imgElement.style.maxHeight = '100%';
         imgElement.style.width = '';
         imgElement.style.height = '';
+        imgElement.style.objectFit = '';
     } else {
-        // Remove max constraints when zoomed
+        // 수동 줌
         imgElement.style.maxWidth = 'none';
         imgElement.style.maxHeight = 'none';
         imgElement.style.width = (zoomLevel) + '%';
         imgElement.style.height = 'auto';
+        imgElement.style.objectFit = '';
     }
 }
 
@@ -153,7 +180,9 @@ export async function loadFile(fileInfo) {
     totalImages = fileInfo.total_images || 0;
     currentIndex = fileInfo.last_position || 0;
     zoomLevel = 100;
-    zoomLabel.textContent = '100%';
+    fitToPage = true;
+    btnFitToPage.classList.add('active');
+    zoomLabel.textContent = '맞춤';
 
     // Load image list from backend
     try {

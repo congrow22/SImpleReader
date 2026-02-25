@@ -28,6 +28,8 @@ const state = {
     activeFileId: null
 };
 
+let isFullscreen = false;
+
 // ============================================================
 // Initialization
 // ============================================================
@@ -88,6 +90,12 @@ async function initApp() {
     const btnEditMode = document.getElementById('btn-edit-mode');
     if (btnEditMode) {
         btnEditMode.addEventListener('click', handleToggleEditMode);
+    }
+
+    // Fullscreen toggle button
+    const btnFullscreen = document.getElementById('btn-fullscreen');
+    if (btnFullscreen) {
+        btnFullscreen.addEventListener('click', toggleFullscreen);
     }
 
     // 앱 종료 시 현재 위치 저장 후 닫기
@@ -508,8 +516,19 @@ function initKeyboardShortcuts() {
             return;
         }
 
-        // Escape: Close dialogs
+        // F11: Toggle fullscreen
+        if (e.key === 'F11') {
+            e.preventDefault();
+            toggleFullscreen();
+            return;
+        }
+
+        // Escape: Exit fullscreen or close dialogs
         if (e.key === 'Escape') {
+            if (isFullscreen) {
+                toggleFullscreen();
+                return;
+            }
             if (SearchDialog.isOpen()) {
                 SearchDialog.hide();
                 Editor.clearSearchHighlights();
@@ -642,6 +661,9 @@ function handleMenuAction(action) {
             break;
         case 'toggle-bookmark-panel':
             toggleSidebar();
+            break;
+        case 'toggle-fullscreen':
+            toggleFullscreen();
             break;
         case 'add-bookmark':
             handleAddBookmark();
@@ -1100,6 +1122,23 @@ function toggleSidebar() {
     const reopenBtn = document.getElementById('btn-reopen-sidebar');
     if (reopenBtn) {
         reopenBtn.classList.toggle('hidden', !BookmarkPanel.isCollapsed());
+    }
+}
+
+// ============================================================
+// Fullscreen Toggle
+// ============================================================
+
+async function toggleFullscreen() {
+    const appWindow = getCurrentWindow();
+    isFullscreen = !isFullscreen;
+    await appWindow.setFullscreen(isFullscreen);
+    document.body.classList.toggle('fullscreen-mode', isFullscreen);
+
+    // 전체화면 메뉴 텍스트 업데이트
+    const menuItem = document.querySelector('[data-action="toggle-fullscreen"] span:first-child');
+    if (menuItem) {
+        menuItem.textContent = isFullscreen ? '전체 화면 해제' : '전체 화면';
     }
 }
 

@@ -172,12 +172,23 @@ impl ZipIndex {
     }
 
     /// Parse Central Directory entries sequentially.
+    /// Handles non-UTF-8 filenames (e.g. EUC-KR, Shift-JIS) via chardetng auto-detection.
     fn parse_cd(
         data: &[u8],
         cd_offset: usize,
         num_entries: usize,
     ) -> anyhow::Result<Vec<EntryMeta>> {
-        let mut entries = Vec::with_capacity(num_entries);
+        // First pass: collect raw entries with name bytes
+        struct RawEntry {
+            compression_method: u16,
+            compressed_size: u64,
+            uncompressed_size: u64,
+            local_header_offset: u64,
+            name_bytes: Vec<u8>,
+            is_utf8_flag: bool,
+        }
+
+        let mut raw_entries = Vec::with_capacity(num_entries);
         let mut pos = cd_offset;
 
         for _ in 0..num_entries {
@@ -188,6 +199,8 @@ impl ZipIndex {
                 break;
             }
 
+            let flags = r16(data, pos + 8);
+            let is_utf8_flag = (flags & (1 << 11)) != 0;
             let method = r16(data, pos + 10);
             let c32 = r32(data, pos + 20) as u64;
             let u32_ = r32(data, pos + 24) as u64;
@@ -201,7 +214,7 @@ impl ZipIndex {
                 break;
             }
 
-            let name = String::from_utf8_lossy(&data[pos + 46..name_end]).to_string();
+            let name_bytes = data[pos + 46..name_end].to_vec();
 
             let mut compressed = c32;
             let mut uncompressed = u32_;
@@ -223,16 +236,55 @@ impl ZipIndex {
                 }
             }
 
-            entries.push(EntryMeta {
-                name,
+            raw_entries.push(RawEntry {
                 compression_method: method,
                 compressed_size: compressed,
                 uncompressed_size: uncompressed,
                 local_header_offset: offset,
+                name_bytes,
+                is_utf8_flag,
             });
 
             pos = name_end + extra_len + comment_len;
         }
+
+        // Detect encoding for non-UTF-8 filenames
+        let mut detector = chardetng::EncodingDetector::new();
+        let mut has_non_utf8 = false;
+        for entry in &raw_entries {
+            if !entry.is_utf8_flag && std::str::from_utf8(&entry.name_bytes).is_err() {
+                detector.feed(&entry.name_bytes, false);
+                has_non_utf8 = true;
+            }
+        }
+        let detected_encoding = if has_non_utf8 {
+            detector.feed(&[], true);
+            detector.guess(None, true)
+        } else {
+            encoding_rs::UTF_8
+        };
+
+        // Build final entries with properly decoded names
+        let entries = raw_entries
+            .into_iter()
+            .map(|raw| {
+                let name = if raw.is_utf8_flag
+                    || std::str::from_utf8(&raw.name_bytes).is_ok()
+                {
+                    String::from_utf8_lossy(&raw.name_bytes).to_string()
+                } else {
+                    let (decoded, _, _) = detected_encoding.decode(&raw.name_bytes);
+                    decoded.to_string()
+                };
+                EntryMeta {
+                    name,
+                    compression_method: raw.compression_method,
+                    compressed_size: raw.compressed_size,
+                    uncompressed_size: raw.uncompressed_size,
+                    local_header_offset: raw.local_header_offset,
+                }
+            })
+            .collect();
 
         Ok(entries)
     }
