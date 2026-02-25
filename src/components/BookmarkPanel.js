@@ -11,6 +11,7 @@ let bookmarks = [];
 let allBookmarks = [];
 let isAllMode = false;
 let searchQuery = '';
+let fileSearchQuery = '';
 let onBookmarkClick = null;
 let onFileClick = null;
 let onFileRemove = null;
@@ -28,6 +29,7 @@ const fileListView = document.getElementById('file-list-view');
 const bookmarkView = document.getElementById('bookmark-view');
 const tabFiles = document.getElementById('panel-tab-files');
 const tabBookmarks = document.getElementById('panel-tab-bookmarks');
+const fileSearchInput = document.getElementById('file-search-input');
 
 const favoritesBtn = document.getElementById('btn-toggle-favorites');
 
@@ -44,6 +46,12 @@ export function init(options = {}) {
     searchInput.addEventListener('input', (e) => {
         searchQuery = e.target.value.trim();
         renderBookmarks();
+    });
+
+    // File search
+    fileSearchInput.addEventListener('input', (e) => {
+        fileSearchQuery = e.target.value.trim().toLowerCase();
+        renderFileList();
     });
 
     // Bookmark mode toggle
@@ -104,7 +112,13 @@ function renderFileList() {
         fileListContainer.removeChild(fileListContainer.firstChild);
     }
 
-    const filtered = showFavoritesOnly ? fileList.filter(e => e.favorite) : fileList;
+    let filtered = showFavoritesOnly ? fileList.filter(e => e.favorite) : fileList;
+    if (fileSearchQuery) {
+        filtered = filtered.filter(e =>
+            e.file_name.toLowerCase().includes(fileSearchQuery) ||
+            e.file_path.toLowerCase().includes(fileSearchQuery)
+        );
+    }
 
     if (filtered.length === 0) {
         const emptyEl = document.createElement('div');
@@ -153,12 +167,6 @@ function renderFileList() {
         }
         metaEl.textContent = parts.join(' \u00B7 ');
         content.appendChild(metaEl);
-
-        const pathEl = document.createElement('div');
-        pathEl.className = 'file-list-item-path';
-        pathEl.textContent = entry.file_path;
-        pathEl.title = entry.file_path;
-        content.appendChild(pathEl);
 
         item.appendChild(content);
 
