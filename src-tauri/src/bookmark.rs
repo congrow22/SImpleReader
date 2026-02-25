@@ -238,6 +238,17 @@ impl BookmarkStore {
         self.save_to_disk()
     }
 
+    /// 책갈피 메모 수정.
+    pub fn update_bookmark(&mut self, file_path: &str, index: usize, memo: &str) -> anyhow::Result<()> {
+        let entry = self.data.get_mut(file_path)
+            .ok_or_else(|| anyhow::anyhow!("File not found: {}", file_path))?;
+        if index >= entry.bookmarks.len() {
+            anyhow::bail!("Bookmark index out of range");
+        }
+        entry.bookmarks[index].memo = memo.to_string();
+        self.save_to_disk()
+    }
+
     /// 책갈피 순서 변경 (from → to 위치로 이동).
     pub fn move_bookmark(&mut self, file_path: &str, from: usize, to: usize) -> anyhow::Result<()> {
         let entry = self.data.get_mut(file_path)

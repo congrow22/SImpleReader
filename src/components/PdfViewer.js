@@ -217,6 +217,9 @@ export async function loadFile(fileInfo) {
     currentPage = fileInfo.last_position || 1;
     if (currentPage < 1) currentPage = 1;
 
+    show();
+    showLoading();
+
     try {
         // ipc::Response로 바이너리 직접 전송 (JSON 직렬화 없이 ArrayBuffer로 수신)
         const data = await invoke('read_pdf_bytes', { fileId: currentFileId });
@@ -229,12 +232,11 @@ export async function loadFile(fileInfo) {
 
     if (currentPage > totalPages) currentPage = 1;
 
-    show();
-
     if (continuousMode) {
         await renderAllPages();
     } else {
         await goToPage(currentPage);
+        hideLoading();
     }
 }
 

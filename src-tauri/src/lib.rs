@@ -125,6 +125,7 @@ pub fn run() {
             commands::toggle_favorite,
             commands::reorder_file_list,
             commands::move_bookmark,
+            commands::update_bookmark,
             commands::save_format_type,
             commands::get_format_type,
             // Search commands

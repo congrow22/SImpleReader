@@ -829,6 +829,21 @@ html, body {
     text-overflow: ellipsis;
 }
 
+.bookmark-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    opacity: 0;
+    transition: all var(--transition-fast);
+}
+
+.bookmark-item:hover .bookmark-item-actions {
+    opacity: 1;
+}
+
+.bookmark-item-edit,
 .bookmark-item-delete {
     display: flex;
     align-items: center;
@@ -841,14 +856,12 @@ html, body {
     cursor: pointer;
     border-radius: 3px;
     font-size: 12px;
-    opacity: 0;
-    flex-shrink: 0;
-    margin-top: 2px;
     transition: all var(--transition-fast);
 }
 
-.bookmark-item:hover .bookmark-item-delete {
-    opacity: 1;
+.bookmark-item-edit:hover {
+    background: rgba(74, 158, 255, 0.2);
+    color: var(--accent);
 }
 
 .bookmark-item-delete:hover {

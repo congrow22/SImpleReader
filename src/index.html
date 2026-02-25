@@ -477,6 +477,24 @@
         </div>
     </div>
 
+    <!-- Bookmark Edit Dialog -->
+    <div id="bookmark-edit-dialog" class="modal-overlay hidden">
+        <div class="modal-dialog bookmark-add-modal">
+            <div class="modal-header">
+                <h3>책갈피 수정</h3>
+                <button class="modal-close-btn" id="btn-bookmark-edit-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="bookmark-add-info" id="bookmark-edit-info">줄: 0</p>
+                <input type="text" id="bookmark-edit-memo-input" class="goto-input" placeholder="메모 입력..." />
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="btn-bookmark-edit-cancel">취소</button>
+                <button class="modal-btn modal-btn-primary" id="btn-bookmark-edit-confirm">저장</button>
+            </div>
+        </div>
+    </div>
+
     <!-- File Delete Confirm Dialog -->
     <div id="file-delete-dialog" class="modal-overlay hidden">
         <div class="modal-dialog bookmark-add-modal">

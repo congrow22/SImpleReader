@@ -121,6 +121,19 @@ pub async fn move_bookmark(
 }
 
 #[command]
+pub async fn update_bookmark(
+    file_path: String,
+    index: usize,
+    memo: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut store = state.bookmark_store.lock().map_err(|e| e.to_string())?;
+    store
+        .update_bookmark(&file_path, index, &memo)
+        .map_err(|e| e.to_string())
+}
+
+#[command]
 pub async fn save_last_position(
     file_path: String,
     position: usize,
