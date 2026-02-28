@@ -584,6 +584,39 @@ html, body {
     flex-shrink: 0;
 }
 
+/* File Type Filter Tabs */
+.file-type-tabs {
+    display: flex;
+    padding: 4px 12px;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.file-type-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all var(--transition-fast);
+}
+
+.file-type-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.file-type-tab.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+}
+
 /* File List */
 .file-list {
     flex: 1;

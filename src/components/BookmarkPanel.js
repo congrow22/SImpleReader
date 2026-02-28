@@ -18,6 +18,7 @@ let onFileRemove = null;
 let activeView = 'files'; // 'files' or 'bookmarks'
 let fileList = [];
 let showFavoritesOnly = false;
+let fileTypeFilter = null; // null = all, 'text' | 'epub' | 'pdf' | 'image'
 
 // DOM
 const panel = document.getElementById('bookmark-panel');
@@ -32,6 +33,7 @@ const tabBookmarks = document.getElementById('panel-tab-bookmarks');
 const fileSearchInput = document.getElementById('file-search-input');
 
 const favoritesBtn = document.getElementById('btn-toggle-favorites');
+const fileTypeTabs = document.querySelectorAll('.file-type-tab');
 
 export function init(options = {}) {
     onBookmarkClick = options.onBookmarkClick || null;
@@ -70,6 +72,23 @@ export function init(options = {}) {
             renderFileList();
         });
     }
+
+    // File type filter tabs
+    fileTypeTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const type = tab.dataset.type;
+            if (fileTypeFilter === type) {
+                // 같은 탭을 다시 클릭하면 필터 해제
+                fileTypeFilter = null;
+                tab.classList.remove('active');
+            } else {
+                fileTypeFilter = type;
+                fileTypeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+            }
+            renderFileList();
+        });
+    });
 
     // Load file list on init
     refreshFileList();
@@ -113,6 +132,9 @@ function renderFileList() {
     }
 
     let filtered = showFavoritesOnly ? fileList.filter(e => e.favorite) : fileList;
+    if (fileTypeFilter) {
+        filtered = filtered.filter(e => guessFileType(e.file_path) === fileTypeFilter);
+    }
     if (fileSearchQuery) {
         filtered = filtered.filter(e =>
             e.file_name.toLowerCase().includes(fileSearchQuery) ||
@@ -296,6 +318,7 @@ function guessFileType(filePath) {
     const ext = filePath.split('.').pop().toLowerCase();
     if (ext === 'epub') return 'epub';
     if (ext === 'pdf') return 'pdf';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'zip'].includes(ext)) return 'image';
     return 'text';
 }
 
