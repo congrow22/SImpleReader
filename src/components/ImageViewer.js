@@ -270,8 +270,17 @@ function getMimeType(filename) {
     return mimeMap[ext] || 'image/png';
 }
 
-function showLoading() { loadingOverlay.classList.remove('hidden'); }
-function hideLoading() { loadingOverlay.classList.add('hidden'); }
+let loadingTimer = null;
+function showLoading() {
+    clearTimeout(loadingTimer);
+    loadingTimer = setTimeout(() => {
+        loadingOverlay.classList.remove('hidden');
+    }, 1000);
+}
+function hideLoading() {
+    clearTimeout(loadingTimer);
+    loadingOverlay.classList.add('hidden');
+}
 
 export function show() { container.classList.remove('hidden'); }
 export function hide() { container.classList.add('hidden'); }
