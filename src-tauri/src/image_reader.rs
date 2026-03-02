@@ -1,6 +1,160 @@
+use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"];
+
+// ── Natural Sort ──
+
+#[derive(Eq, PartialEq)]
+enum SortChunk {
+    Text(String),
+    Num(u64),
+}
+
+impl Ord for SortChunk {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (SortChunk::Num(a), SortChunk::Num(b)) => a.cmp(b),
+            (SortChunk::Text(a), SortChunk::Text(b)) => a.cmp(b),
+            (SortChunk::Text(_), SortChunk::Num(_)) => Ordering::Less,
+            (SortChunk::Num(_), SortChunk::Text(_)) => Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for SortChunk {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+fn natural_sort_key(s: &str) -> Vec<SortChunk> {
+    let mut chunks = Vec::new();
+    let lower = s.to_lowercase();
+    let mut chars = lower.char_indices().peekable();
+
+    while chars.peek().is_some() {
+        let (start, ch) = *chars.peek().unwrap();
+        if ch.is_ascii_digit() {
+            while chars.peek().map_or(false, |(_, c)| c.is_ascii_digit()) {
+                chars.next();
+            }
+            let end = chars.peek().map_or(lower.len(), |(i, _)| *i);
+            chunks.push(SortChunk::Num(lower[start..end].parse().unwrap_or(0)));
+        } else {
+            chars.next();
+            while chars.peek().map_or(false, |(_, c)| !c.is_ascii_digit()) {
+                chars.next();
+            }
+            let end = chars.peek().map_or(lower.len(), |(i, _)| *i);
+            chunks.push(SortChunk::Text(lower[start..end].to_string()));
+        }
+    }
+    chunks
+}
+
+fn natural_sort_cmp(a: &Path, b: &Path) -> Ordering {
+    let a_name = a.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let b_name = b.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    natural_sort_key(&a_name).cmp(&natural_sort_key(&b_name))
+}
+
+// ── 시리즈 그룹핑 ──
+
+static DIGIT_RE: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"\d+").unwrap());
+
+/// 파일명(확장자 제외)에서 마지막 숫자 블록 앞의 접두사를 추출.
+/// 숫자가 없으면 전체 파일명을 소문자로 반환.
+fn extract_series_prefix(stem: &str) -> String {
+    let mut last_start = None;
+    for m in DIGIT_RE.find_iter(stem) {
+        last_start = Some(m.start());
+    }
+    match last_start {
+        Some(start) => stem[..start].to_lowercase(),
+        None => stem.to_lowercase(),
+    }
+}
+
+/// 같은 디렉토리에서 인접한 ZIP 파일 경로를 찾는다.
+/// (이전 ZIP, 다음 ZIP) 튜플을 반환.
+pub fn find_adjacent_zips(current_zip: &Path) -> anyhow::Result<(Option<PathBuf>, Option<PathBuf>)> {
+    let dir = current_zip
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine parent directory"))?;
+
+    let current_name = current_zip
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("Cannot get filename"))?
+        .to_string_lossy();
+
+    // 같은 디렉토리의 ZIP 파일 수집 + natural sort
+    let mut zips: Vec<PathBuf> = std::fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            p.is_file()
+                && p.extension()
+                    .map(|ext| ext.to_string_lossy().to_lowercase() == "zip")
+                    .unwrap_or(false)
+        })
+        .collect();
+
+    zips.sort_by(|a, b| natural_sort_cmp(a, b));
+
+    // 현재 파일의 접두사 추출
+    let current_stem = current_zip
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let current_prefix = extract_series_prefix(&current_stem);
+
+    // 같은 접두사의 파일들로 그룹핑
+    let group: Vec<&PathBuf> = zips
+        .iter()
+        .filter(|p| {
+            let stem = p.file_stem()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            extract_series_prefix(&stem) == current_prefix
+        })
+        .collect();
+
+    // 그룹 크기 > 1이면 그룹 내 탐색, 아니면 전체 목록으로 폴백
+    let search_list: Vec<&PathBuf> = if group.len() > 1 {
+        group
+    } else {
+        zips.iter().collect()
+    };
+
+    // 현재 위치 찾기
+    let current_pos = search_list
+        .iter()
+        .position(|p| {
+            p.file_name()
+                .map(|n| n.to_string_lossy().to_lowercase())
+                == Some(current_name.to_lowercase().into())
+        });
+
+    let current_pos = match current_pos {
+        Some(pos) => pos,
+        None => return Ok((None, None)),
+    };
+
+    let prev = if current_pos > 0 {
+        Some(search_list[current_pos - 1].clone())
+    } else {
+        None
+    };
+    let next = if current_pos + 1 < search_list.len() {
+        Some(search_list[current_pos + 1].clone())
+    } else {
+        None
+    };
+
+    Ok((prev, next))
+}
 
 #[allow(dead_code)]
 pub enum ImageSource {

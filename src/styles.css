@@ -1855,11 +1855,11 @@ select:focus-visible {
 .pdf-page-wrapper {
     display: flex;
     justify-content: center;
-    padding: 12px 0;
+    padding: 24px 0;
 }
 
 .pdf-page-wrapper:first-child {
-    padding-top: 12px;
+    padding-top: 24px;
 }
 
 .pdf-loading-overlay {

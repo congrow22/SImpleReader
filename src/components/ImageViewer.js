@@ -12,6 +12,12 @@ let imageNames = [];
 let currentIndex = 0;
 let totalImages = 0;
 let onImageChange = null;
+let onOpenFile = null;
+
+// ZIP 시리즈 탐색 상태
+let isZipFile = false;
+let prevZipPath = null;
+let nextZipPath = null;
 
 // Zoom state
 let zoomLevel = 100;
@@ -41,6 +47,7 @@ let imgElement = null;
 
 export function init(options = {}) {
     onImageChange = options.onImageChange || null;
+    onOpenFile = options.onOpenFile || null;
 
     // Create img element
     imgElement = document.createElement('img');
@@ -107,16 +114,12 @@ function handleKeydown(e) {
         }
     }
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        if (currentIndex > 0) {
-            e.preventDefault();
-            goToImage(currentIndex - 1);
-        }
+        e.preventDefault();
+        goToImage(currentIndex - 1);
     }
     if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-        if (currentIndex < totalImages - 1) {
-            e.preventDefault();
-            goToImage(currentIndex + 1);
-        }
+        e.preventDefault();
+        goToImage(currentIndex + 1);
     }
     if (e.key === 'Home') {
         e.preventDefault();
@@ -208,12 +211,35 @@ export async function loadFile(fileInfo) {
 
     if (currentIndex >= totalImages) currentIndex = 0;
 
+    // ZIP 파일이면 시리즈 정보 로드
+    isZipFile = (currentFilePath || '').toLowerCase().endsWith('.zip');
+    prevZipPath = null;
+    nextZipPath = null;
+    if (isZipFile) {
+        try {
+            const info = await invoke('get_adjacent_zips', { fileId: currentFileId });
+            prevZipPath = info.prev_path || null;
+            nextZipPath = info.next_path || null;
+        } catch {
+            // 시리즈 정보 없음
+        }
+    }
+
     show();
     contentArea.focus();
     await goToImage(currentIndex);
 }
 
 async function goToImage(index) {
+    // 범위 초과 시 인접 ZIP으로 전환
+    if (index >= totalImages && isZipFile && nextZipPath && onOpenFile) {
+        onOpenFile(nextZipPath);
+        return;
+    }
+    if (index < 0 && isZipFile && prevZipPath && onOpenFile) {
+        onOpenFile(prevZipPath, { startFromEnd: true });
+        return;
+    }
     if (index < 0 || index >= totalImages || !currentFileId) return;
 
     showLoading();

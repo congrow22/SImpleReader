@@ -180,19 +180,22 @@ async function reRenderVisiblePages() {
     const scale = zoomLevel / 100;
     const firstPage = await pdfDoc.getPage(1);
     const vp = firstPage.getViewport({ scale: scale * window.devicePixelRatio });
-    const cssW = (vp.width / window.devicePixelRatio) + 'px';
-    const cssH = (vp.height / window.devicePixelRatio) + 'px';
     refPageWidth = vp.width;
     refPageHeight = vp.height;
 
-    // 모든 wrapper의 높이 갱신 (width는 flex 가운데 정렬을 위해 설정하지 않음)
+    // 모든 wrapper의 높이를 각 페이지 실제 크기로 갱신
     const wrappers = continuousContainer.querySelectorAll('[data-page]');
     for (const w of wrappers) {
-        w.style.height = cssH;
+        const pageNum = parseInt(w.dataset.page);
+        const page = await pdfDoc.getPage(pageNum);
+        const pageVp = page.getViewport({ scale: scale * window.devicePixelRatio });
+        const pageCssW = (pageVp.width / window.devicePixelRatio) + 'px';
+        const pageCssH = (pageVp.height / window.devicePixelRatio) + 'px';
+        w.style.height = pageCssH;
         const canvas = w.querySelector('canvas');
         if (canvas) {
-            canvas.style.width = cssW;
-            canvas.style.height = cssH;
+            canvas.style.width = pageCssW;
+            canvas.style.height = pageCssH;
         }
     }
 
@@ -414,6 +417,10 @@ async function renderPageAndWait(wrapper, pageNum) {
         const scale = zoomLevel / 100;
         const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
 
+        // 실제 페이지 크기로 wrapper 높이 갱신 (페이지별 크기가 다를 수 있음)
+        const actualCssH = (viewport.height / window.devicePixelRatio) + 'px';
+        wrapper.style.height = actualCssH;
+
         const canvas = document.createElement('canvas');
         canvas.className = 'pdf-canvas';
         canvas.width = viewport.width;
@@ -434,6 +441,10 @@ async function renderLazyPage(wrapper, pageNum) {
         const page = await pdfDoc.getPage(pageNum);
         const scale = zoomLevel / 100;
         const viewport = page.getViewport({ scale: scale * window.devicePixelRatio });
+
+        // 실제 페이지 크기로 wrapper 높이 갱신 (페이지별 크기가 다를 수 있음)
+        const actualCssH = (viewport.height / window.devicePixelRatio) + 'px';
+        wrapper.style.height = actualCssH;
 
         // canvas가 아직 없으면 온디맨드 생성
         let canvas = wrapper.querySelector('canvas');

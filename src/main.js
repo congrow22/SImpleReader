@@ -229,6 +229,9 @@ function initImageViewer() {
     ImageViewer.init({
         onImageChange: (index, totalImages) => {
             updateImageStatusBar(index, totalImages);
+        },
+        onOpenFile: async (filePath, options) => {
+            await openFile(filePath, options);
         }
     });
 }
@@ -749,7 +752,7 @@ async function saveCurrentPosition() {
     }
 }
 
-async function openFile(path) {
+async function openFile(path, options = {}) {
     const loadingOverlay = document.getElementById('editor-loading-overlay');
     let loadingTimer = null;
     try {
@@ -791,6 +794,9 @@ async function openFile(path) {
             EpubViewer.hide();
             PdfViewer.hide();
             document.getElementById('editor-container').classList.add('hidden');
+            if (options.startFromEnd) {
+                fileInfo.last_position = (fileInfo.total_images || 1) - 1;
+            }
             await ImageViewer.loadFile(fileInfo);
             updateImageStatusBar(fileInfo.last_position || 0, fileInfo.total_images || 0);
         } else {

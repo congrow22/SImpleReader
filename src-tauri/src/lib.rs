@@ -153,6 +153,7 @@ pub fn run() {
             // Image commands
             commands::get_image_list,
             commands::get_image_bytes,
+            commands::get_adjacent_zips,
             // App lifecycle
             commands::exit_app,
         ])
