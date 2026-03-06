@@ -236,17 +236,7 @@ pub fn scan_directory_images(dir_path: &Path) -> anyhow::Result<(PathBuf, Vec<Pa
         .filter(|p| p.is_file() && is_image_file(&p.to_string_lossy()))
         .collect();
 
-    images.sort_by(|a, b| {
-        let a_name = a
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-        let b_name = b
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-        a_name.cmp(&b_name)
-    });
+    images.sort_by(|a, b| natural_sort_cmp(a, b));
 
     Ok((dir_path.to_path_buf(), images))
 }
@@ -264,18 +254,7 @@ pub fn scan_folder_images(file_path: &Path) -> anyhow::Result<(PathBuf, Vec<Path
         .filter(|p| p.is_file() && is_image_file(&p.to_string_lossy()))
         .collect();
 
-    // Sort alphabetically by filename (case-insensitive)
-    images.sort_by(|a, b| {
-        let a_name = a
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-        let b_name = b
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-        a_name.cmp(&b_name)
-    });
+    images.sort_by(|a, b| natural_sort_cmp(a, b));
 
     let target_name = file_path
         .file_name()
@@ -306,7 +285,18 @@ pub fn list_zip_images(zip_path: &Path) -> anyhow::Result<Vec<String>> {
     entries.sort_by(|a, b| {
         let a_parts: Vec<&str> = a.split('/').collect();
         let b_parts: Vec<&str> = b.split('/').collect();
-        a_parts.cmp(&b_parts)
+        // 디렉토리 경로 깊이가 같으면 natural sort로 비교
+        let depth = a_parts.len().cmp(&b_parts.len());
+        if depth != Ordering::Equal {
+            return depth;
+        }
+        for (ap, bp) in a_parts.iter().zip(b_parts.iter()) {
+            let cmp = natural_sort_key(ap).cmp(&natural_sort_key(bp));
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+        }
+        Ordering::Equal
     });
 
     Ok(entries)

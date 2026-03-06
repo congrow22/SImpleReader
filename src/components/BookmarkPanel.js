@@ -77,13 +77,13 @@ export function init(options = {}) {
     fileTypeTabs.forEach(tab => {
         tab.addEventListener('click', () => {
             const type = tab.dataset.type;
-            if (fileTypeFilter === type) {
-                // 같은 탭을 다시 클릭하면 필터 해제
+            fileTypeTabs.forEach(t => t.classList.remove('active'));
+            if (type === 'all' || fileTypeFilter === type) {
+                // 전체 탭 또는 같은 탭을 다시 클릭하면 필터 해제
                 fileTypeFilter = null;
-                tab.classList.remove('active');
+                document.querySelector('.file-type-tab[data-type="all"]').classList.add('active');
             } else {
                 fileTypeFilter = type;
-                fileTypeTabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
             }
             renderFileList();
