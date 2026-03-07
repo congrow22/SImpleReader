@@ -40,9 +40,15 @@ let pageRenderQueue = [];
 let activePageRenders = 0;
 const MAX_CONCURRENT_PAGE_RENDERS = 2;
 
+// Canvas 가상화: 뷰포트 근처 페이지만 canvas 유지 (메모리 절약)
+const MAX_RENDERED_CANVASES = 20;
+
 // 기준 페이지 크기 캐시 (줌 변경 시 재사용)
 let refPageWidth = 0;
 let refPageHeight = 0;
+
+// wrapper 배열 캐시 (매 스크롤마다 querySelectorAll 방지)
+let cachedWrappers = [];
 
 // DOM elements
 const container = document.getElementById('pdf-viewer-container');
@@ -364,13 +370,15 @@ async function renderAllPages(targetPage) {
     hideLoading();
     continuousContainer.addEventListener('scroll', trackPageOnScroll);
 
-    // 5단계: IntersectionObserver로 나머지 페이지 레이지 렌더링
+    // 5단계: wrapper 배열 캐싱 (스크롤 이벤트에서 재사용)
+    cachedWrappers = Array.from(continuousContainer.querySelectorAll('[data-page]'));
+
+    // 6단계: IntersectionObserver로 나머지 페이지 레이지 렌더링
     pageObserver = new IntersectionObserver(handlePageIntersect, {
         root: continuousContainer,
         rootMargin: '200px 0px',
     });
-    const wrappers = continuousContainer.querySelectorAll('[data-page]');
-    wrappers.forEach(w => pageObserver.observe(w));
+    cachedWrappers.forEach(w => pageObserver.observe(w));
 }
 
 function handlePageIntersect(entries) {
@@ -380,7 +388,6 @@ function handlePageIntersect(entries) {
         if (!entry.isIntersecting) continue;
         const pageNum = parseInt(entry.target.dataset.page, 10);
         if (renderedPages.has(pageNum)) continue;
-        renderedPages.add(pageNum);
         newPages.push({ wrapper: entry.target, pageNum });
     }
     if (newPages.length === 0) return;
@@ -389,6 +396,33 @@ function handlePageIntersect(entries) {
     pageRenderQueue = [];
     for (const { wrapper, pageNum } of newPages) {
         enqueuePageRender(wrapper, pageNum);
+    }
+}
+
+/**
+ * 뷰포트에서 멀어진 페이지의 canvas를 제거하여 메모리 확보.
+ * wrapper의 height는 유지하여 스크롤 위치가 어긋나지 않음.
+ */
+function evictDistantCanvases() {
+    if (renderedPages.size <= MAX_RENDERED_CANVASES) return;
+
+    // 현재 페이지에서 가장 먼 페이지부터 제거
+    const sorted = [...renderedPages].sort((a, b) =>
+        Math.abs(a - currentPage) - Math.abs(b - currentPage)
+    );
+
+    while (sorted.length > MAX_RENDERED_CANVASES) {
+        const farPage = sorted.pop();
+        const wrapper = continuousContainer.querySelector('[data-page="' + farPage + '"]');
+        if (wrapper) {
+            const canvas = wrapper.querySelector('canvas');
+            if (canvas) {
+                canvas.width = 0;
+                canvas.height = 0;
+                wrapper.removeChild(canvas);
+            }
+        }
+        renderedPages.delete(farPage);
     }
 }
 
@@ -431,8 +465,8 @@ async function renderPageAndWait(wrapper, pageNum) {
 
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
-    } catch {
-        // 렌더링 실패
+    } catch (e) {
+        console.warn('[PdfViewer] 페이지 ' + pageNum + ' 렌더링 실패:', e);
     }
 }
 
@@ -461,8 +495,12 @@ async function renderLazyPage(wrapper, pageNum) {
 
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
-    } catch {
-        // skip failed pages
+
+        // 렌더링 성공 시에만 추적하고, 먼 페이지 canvas 정리
+        renderedPages.add(pageNum);
+        evictDistantCanvases();
+    } catch (e) {
+        console.warn('[PdfViewer] 페이지 ' + pageNum + ' 렌더링 실패:', e);
     }
 }
 
@@ -480,14 +518,13 @@ function scrollToPage(num) {
 }
 
 function trackPageOnScroll() {
-    if (!continuousMode || !continuousContainer) return;
+    if (!continuousMode || !continuousContainer || cachedWrappers.length === 0) return;
 
-    const wrappers = continuousContainer.querySelectorAll('[data-page]');
     const threshold = continuousContainer.clientHeight * 0.3;
     const containerTop = continuousContainer.getBoundingClientRect().top;
 
     let visiblePage = 1;
-    for (const w of wrappers) {
+    for (const w of cachedWrappers) {
         const rect = w.getBoundingClientRect();
         if (rect.top - containerTop <= threshold) {
             visiblePage = parseInt(w.dataset.page, 10);
@@ -521,6 +558,7 @@ export function clear() {
     pageRenderQueue = [];
     activePageRenders = 0;
     renderedPages.clear();
+    cachedWrappers = [];
     currentFileId = null;
     currentFilePath = null;
     pdfDoc = null;
